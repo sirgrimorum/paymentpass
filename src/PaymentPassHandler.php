@@ -28,8 +28,9 @@ class PaymentPassHandler {
      * @return \Sirgrimorum\PaymentPass\Models\PaymentPass
      */
     public function getByReferencia($referencia) {
-        $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $this) {
-                    return ($this->generateResponseCode([], $paymentAux) == $referencia);
+        $este = $this;
+        $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
+                    return ($este->generateResponseCode([], $paymentAux) == $referencia);
                 })->first();
         return $this->payment;
     }

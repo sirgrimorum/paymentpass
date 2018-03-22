@@ -42,10 +42,7 @@ class PaymentPassServiceProvider extends ServiceProvider
         );
         $loader = AliasLoader::getInstance();
             $loader->alias(
-                    'PaymentPass', PaymentPass::class
+                    'PaymentPassHandler', PaymentPassHandler::class
             );
-        $this->app->singleton(PaymentPass::class, function($app) {
-            return new PaymentPass($app);
-        });
     }
 }
