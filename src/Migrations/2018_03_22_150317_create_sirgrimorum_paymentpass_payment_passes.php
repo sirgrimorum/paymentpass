@@ -3,7 +3,7 @@
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
-class CreateSirgrimorumPaymentpassPaymentPasss extends Migration {
+class CreateSirgrimorumPaymentpassPaymentPasses extends Migration {
 
     /**
      * Run the migrations.
@@ -11,7 +11,7 @@ class CreateSirgrimorumPaymentpassPaymentPasss extends Migration {
      * @return void
      */
     public function up() {
-        Schema::create('paymentpasss', function($table) {
+        Schema::create('payment_passes', function($table) {
             $table->engine = 'InnoDB';
             $table->increments('id');
             $table->string('referenceCode', 255)->unique();
@@ -36,7 +36,7 @@ class CreateSirgrimorumPaymentpassPaymentPasss extends Migration {
      * @return void
      */
     public function down() {
-        Schema::drop('paymentpasss');
+        Schema::drop('payment_passes');
     }
 
 }
