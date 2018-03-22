@@ -14,6 +14,7 @@ class PaymentPassServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        $this->loadMigrationsFrom(__DIR__ . '/Migrations');
         $this->publishes([
             __DIR__ . '/Config/paymentpass.php' => config_path('sirgrimorum/paymentpass.php'),
                 ], 'config');
