@@ -259,13 +259,14 @@ class PaymentPassHandler {
         $auxConfig = config("sirgrimorum.paymentpass");
         $config = array_except($auxConfig, ['services_production', 'services_test']);
         $serviceProd = array_get($auxConfig, 'services_production.' . $this->service, []);
-        if (array_get($auxConfig, 'production', false)) {
+        if (!array_get($auxConfig, 'production', false)) {
             $serviceTest = array_get($auxConfig, 'services_test.' . $this->service, []);
             $col = collect($serviceProd);
             $col2 = $col->merge(collect($serviceTest));
             $serviceProd = $col->toArray();
         }
         $config['service'] = $serviceProd;
+        return $config;
     }
 
     /**

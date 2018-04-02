@@ -10,11 +10,11 @@ return [
     'services' => [
         'payu' => [
             'messages' => [
-                "4" => "The transaction has been approved.<br>Your reference code is <strong>:referenceCode</strong>",
-                "5" => "The transaction has expired.<br>Your reference code is <strong>:referenceCode</strong>",
-                "6" => "The transaction has been declined.<br>Your reference code is <strong>:referenceCode</strong>",
-                "7" => "The transaction is pending.<br>SYour reference code is <strong>:referenceCode</strong>",
-                "104" => "An error has occur.<br>Your reference code is <strong>:referenceCode</strong>",
+                "4" => "<h3 class='mt-0'>The transaction has been approved.</h3>Your reference code is <strong>:referenceCode</strong>",
+                "5" => "<h3 class='mt-0'>The transaction has expired.</h3>Your reference code is <strong>:referenceCode</strong>",
+                "6" => "<h3 class='mt-0'>The transaction has been declined.</h3>Your reference code is <strong>:referenceCode</strong>",
+                "7" => "<h3 class='mt-0'>The transaction is pending.</h3>SYour reference code is <strong>:referenceCode</strong>",
+                "104" => "<h3 class='mt-0'>An error has occur.</h3>Your reference code is <strong>:referenceCode</strong>",
             ],
             "selects" => [
                 "state" => [

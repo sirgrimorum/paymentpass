@@ -10,11 +10,11 @@ return [
     'services' => [
         'payu' => [
             'messages' => [
-                "4" => "La transacción ha sido aprobada.<br>Su código de referencia es <strong>:referenceCode</strong>",
-                "5" => "La transacción ha expirado.<br>Su código de referencia es <strong>:referenceCode</strong>",
-                "6" => "La transacción ha sido declinada.<br>Su código de referencia es <strong>:referenceCode</strong>",
-                "7" => "La transacción está pendiente.<br>Su código de referencia es <strong>:referenceCode</strong>",
-                "104" => "Ha ocurrido un error en la transacción.<br>Su código de referencia es <strong>:referenceCode</strong>",
+                "4" => "<h3 class='mt-0'>La transacción ha sido aprobada.</h3>Su código de referencia es <strong>:referenceCode</strong>",
+                "5" => "<h3 class='mt-0'>La transacción ha expirado.</h3>Su código de referencia es <strong>:referenceCode</strong>",
+                "6" => "<h3 class='mt-0'>La transacción ha sido declinada.</h3>Su código de referencia es <strong>:referenceCode</strong>",
+                "7" => "<h3 class='mt-0'>La transacción está pendiente.</h3>Su código de referencia es <strong>:referenceCode</strong>",
+                "104" => "<h3 class='mt-0'>Ha ocurrido un error en la transacción.</h3>Su código de referencia es <strong>:referenceCode</strong>",
             ],
             "selects" => [
                 "state" => [

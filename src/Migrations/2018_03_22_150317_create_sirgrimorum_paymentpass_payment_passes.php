@@ -14,7 +14,7 @@ class CreateSirgrimorumPaymentpassPaymentPasses extends Migration {
         Schema::create('payment_passes', function($table) {
             $table->engine = 'InnoDB';
             $table->increments('id');
-            $table->string('referenceCode', 255)->unique();
+            $table->string('referenceCode', 255)->nullable();
             $table->string('type', 3)->nullable();
             $table->string('state', 3)->default('reg');
             $table->string('payment_method', 255)->nullable();
@@ -25,6 +25,7 @@ class CreateSirgrimorumPaymentpassPaymentPasses extends Migration {
             $table->string('payment_state', 255)->nullable();
             $table->longtext('response_data')->nullable();
             $table->longtext('confirmation_data')->nullable();
+            $table->longtext('creation_data')->nullable();
             $table->integer('process_id')->unsigned()->nullable();
             $table->timestamps();
         });

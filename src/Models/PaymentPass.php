@@ -32,32 +32,5 @@ class PaymentPass extends Model {
         ];
     }
 
-    public function getReferencia(){
-        $referencia = "";
-        
-        switch (config("services.payu.mode")) {
-            case "sha256":
-                $datos['signature'] = Hash::make($strHash);
-                break;
-            case "sha1":
-                $datos['signature'] = sha1($strHash);
-                break;
-            default:
-            case "md5":
-                $datos['signature'] = md5($strHash);
-                break;
-        }
-        return md5($this->id . "-" . $this->name);
-    }
-    
-    public static function getByReferencia($referencia){
-        return Registro::all()->filter(function($registro) use ($referencia){
-            return ($registro->getReferencia()==$referencia);
-        })->first();
-    }
-    
-    public function user() {
-        return $this->belongsTo('App\User');
-    }
 
 }
