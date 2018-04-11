@@ -150,12 +150,13 @@ class PaymentPassHandler {
     public function redirect(array $data) {
         $curConfig = $this->config;
         $curConfig['service']['referenceCode']['value'] = $this->generateResponseCode($data);
-        $curConfig = $this->translateConfig($data, $curConfig);
+        $curConfig = $this->translateConfig($data, $curConfig, $curConfig);
         if (array_get($curConfig, "service.signature.active", false)) {
             $strHash = "";
-            $preHash = array_get($curConfig, "service.signature.separator", "~");
+            $preHash = "";
             foreach (array_get($curConfig, "service.signature.fields", "~") as $parameter) {
                 $strHash .= $preHash . $parameter;
+				$preHash = array_get($curConfig, "service.signature.separator", "~");
             }
             switch (array_get($curConfig, "service.signature.encryption", "md5")) {
                 case "sha256":
@@ -172,7 +173,7 @@ class PaymentPassHandler {
         }
         $curConfig = $this->translateConfig($data, $curConfig);
 
-        return view('paymentpass.redirect', [
+        return view('paymentpass::redirect', [
             'config' => $curConfig,
             'datos' => $data,
         ]);
@@ -230,9 +231,10 @@ class PaymentPassHandler {
         }
         if (array_get($curConfig, "service.referenceCode.type", "auto") == "auto") {
             $strHash = $referenceCode;
-            $preHash = array_get($curConfig, "service.referenceCode.separator", "~");
+			$preHash = "";
             foreach (array_get($curConfig, "service.referenceCode.fields", "~") as $parameter) {
                 $strHash .= $preHash . $parameter;
+				$preHash = array_get($curConfig, "service.referenceCode.separator", "~");
             }
             switch (array_get($curConfig, "service.referenceCode.encryption", "md5")) {
                 case "sha256":
@@ -276,28 +278,32 @@ class PaymentPassHandler {
      * @param array $config Optional The config array to translate
      * @return array The operated config array
      */
-    public function translateConfig(array $data = [], array $config = []) {
+    public function translateConfig(array $data = [], array $config = [], array $configComplete=[]) {
         if (count($config) > 0) {
             $array = $config;
         } else {
             $array = $this->config;
+			//echo "<p>array</p><pre>" . print_r($data,true) . "</pre>";
         }
+		if (count($configComplete)==0){
+			$configComplete = $this->config;
+		}
         $result = [];
         foreach ($array as $key => $item) {
             if (gettype($item) != "Closure Object") {
                 if (is_array($item)) {
-                    $result[$key] = $this->translateConfig($item);
+                    $result[$key] = $this->translateConfig($data,$item,$configComplete);
                 } elseif (is_string($item)) {
-                    //$item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), \App::getLocale(), $item);
+                    $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), \App::getLocale(), $item);
                     $item = $this->translateString($item, "__route__", "route");
                     $item = $this->translateString($item, "__url__", "url");
                     if (function_exists('trans_article')) {
                         $item = $this->translateString($item, "__trans_article__", "trans_article");
                     }
-                    $item = $this->translateString($item, "__trans__", "trans");
                     $item = $this->translateString($item, "__data__", "data", $data);
-                    $item = $this->translateString($item, "__config_paymentpass__", "config_paymentpass", $result, $array);
-                    $item = $this->translateString($item, "__auto__", "auto", $result, $array);
+                    $item = $this->translateString($item, "__trans__", "trans");
+                    $item = $this->translateString($item, "__config_paymentpass__", "config_paymentpass", $configComplete, $result);
+                    $item = $this->translateString($item, "__auto__", "auto", $data, $result);
                     $result[$key] = $item;
                 } else {
                     $result[$key] = $item;
@@ -354,12 +360,12 @@ class PaymentPassHandler {
                         } elseif ($function == 'data') {
                             $piece = $this->getValor($textPiece, $data);
                         } elseif ($function == 'auto') {
-                            $datos = explode($textPiece, "|");
+                            $datos = explode("|",$textPiece);
                             if (count($datos) > 2) {
-                                $datosParameters = explode($datos[1], ",");
-                                $datosFields = explode($datos[2], ",");
+                                $datosParameters = explode(",",$datos[1]);
+                                $datosFields = explode(",",$datos[2] );
                             } elseif (count($datos) > 1) {
-                                $datosParameters = explode($datos[1], ",");
+                                $datosParameters = explode(",",$datos[1]);
                                 $datosFields = [];
                             } else {
                                 $datosParameters = [];
@@ -367,11 +373,11 @@ class PaymentPassHandler {
                             }
                             switch ($datos[0]) {
                                 case "taxReturnBase":
-                                    if (count($datosParameters) == 2) {
+                                    if (count($datosParameters) == 3) {
                                         $impuesto = (double) $this->getValorDesde($datosParameters[0], $data, $config);
                                         $valor = (double) $this->getValorDesde($datosParameters[1], $data, $config);
                                         try {
-                                            $piece = $valor / (1 + $impuesto);
+                                            $piece = number_format(($valor / (1 + $impuesto)),$datosParameters[2],".","");
                                         } catch (Exception $exc) {
                                             $piece = "";
                                         }
@@ -380,11 +386,11 @@ class PaymentPassHandler {
                                     }
                                     break;
                                 case "tax":
-                                    if (count($datosParameters) == 2) {
+                                    if (count($datosParameters) == 3) {
                                         $impuesto = (double) $this->getValorDesde($datosParameters[0], $data, $config);
                                         $base = (double) $this->getValorDesde($datosParameters[1], $data, $config);
                                         try {
-                                            $piece = $base * $impuesto;
+                                            $piece = number_format(($base * $impuesto),$datosParameters[2],".","");
                                         } catch (Exception $exc) {
                                             $piece = "";
                                         }
@@ -393,11 +399,11 @@ class PaymentPassHandler {
                                     }
                                     break;
                                 case "valueToPay":
-                                    if (count($datosParameters) == 2) {
+                                    if (count($datosParameters) == 3) {
                                         $impuesto = (double) $this->getValorDesde($datosParameters[0], $data, $config);
                                         $base = (double) $this->getValorDesde($datosParameters[1], $data, $config);
                                         try {
-                                            $piece = $base * (1 + $impuesto);
+                                            $piece = number_format($base * (1 + $impuesto),$datosParameters[2],".","");
                                         } catch (Exception $exc) {
                                             $piece = "";
                                         }
