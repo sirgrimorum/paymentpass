@@ -22,11 +22,12 @@
         @if (array_get($config,"service.referenceCode.send",false))
         <input name="{{array_get($config,"service.referenceCode.field_name")}}" type="hidden"  value="{{array_get($config,"service.referenceCode.value")}}" >
         @endif
-        @if (array_get($config,"service.signature.active",false))
+        @if (array_get($config,"service.signature.send",false))
         <input name="{{array_get($config,"service.signature.field_name")}}" type="hidden"  value="{{array_get($config,"service.signature.value")}}" >
         @endif
-        <input name="{{array_get($config,"service.response.url_field_name")}}" type="hidden"  value="{{array_get($config,"service.response.url")}}" >
-        <input name="{{array_get($config,"service.confirmation.url_field_name")}}" type="hidden"  value="{{array_get($config,"service.confirmation.url")}}" >
+        @foreach(array_get($config,"service.responses",[]) as $response_name=>$response_datos)
+            <input name="{{array_get($response_datos,"url_field_name","")}}" type="hidden"  value="{{array_get($response_datos,"url","")}}" >
+        @endforeach
         @foreach(array_get($config,"service.parameters",[]) as $parameter=>$value)
         <input name="{{$parameter}}"    type="hidden"  value="{{$value}}"/>
         @endforeach
@@ -37,13 +38,13 @@
 </div>
 {!! array_get($config,"redirect_post_html") !!}
 @stop
+@if (array_get($config, "production", true))
 @push(array_get($config,"js_section"))
 <script>
-    @if (array_get($config, "production", true))
             window.onload = function () {
                 document.forms['paymentPassForm'].submit();
             }
     ;
-    @endif
 </script>
 @endpush
+@endif

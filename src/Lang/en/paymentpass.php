@@ -5,7 +5,8 @@ return [
         'close' => 'Close',
     ],
     'messages'=>[
-        'not_found' => 'No transaction found with the reference code <strong>:referenceCode</strong>. Please contact the administrator.'
+        'not_found' => 'No transaction found with the reference code <strong>:referenceCode</strong>. Please contact the administrator.',
+        'error' => ':error. Please contact the administrator.'
     ],
     'services' => [
         'payu' => [

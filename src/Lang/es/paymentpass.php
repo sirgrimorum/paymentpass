@@ -5,7 +5,8 @@ return [
         'close' => 'Cerrar',
     ],
     'messages'=>[
-        'not_found' => 'La transacción con el código de referencia <strong>:referenceCode</strong> no ha sido encontrada. Por favor póngase en contacto con el administrador'
+        'not_found' => 'La transacción con el código de referencia <strong>:referenceCode</strong> no ha sido encontrada. Por favor póngase en contacto con el administrador',
+        'error' => ':error. Por favor póngase en contacto con el administrador'
     ],
     'services' => [
         'payu' => [
