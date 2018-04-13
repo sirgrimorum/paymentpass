@@ -73,7 +73,7 @@ class PaymentPassHandler {
      * @param string $service Optional The payment service to use
      * @return \Illuminate\View\View | \Illuminate\Contracts\View\Factory
      */
-    public function handleResponse(Request $request, string $service = "",string $responseType) {
+    public function handleResponse(Request $request, string $service = "", string $responseType) {
         if (in_array($service, config("sirgrimorum.paymentpass.available_services"))) {
             $this->service = $service;
             $this->config = $this->buildConfig();
@@ -103,12 +103,12 @@ class PaymentPassHandler {
             } else {
                 return $error;
             }
-            return view(array_get($curConfig, "result_template", "paymentpass.result"), [
-                'user' => $request->user(),
-                'request' => $request,
-                'paymentPass' => $this->payment,
-                'config' => $curConfig,
-            ]);
+            return response()->view(array_get($curConfig, "result_template", "paymentpass.result"), [
+                        'user' => $request->user(),
+                        'request' => $request,
+                        'paymentPass' => $this->payment,
+                        'config' => $curConfig,
+                            ], 200);
         } else {
             if ($this->getByReferencia($request->get(array_get($curConfig, "service.responses.$responseType.referenceCode")))) {
                 $datos = $request->all();
@@ -161,21 +161,25 @@ class PaymentPassHandler {
                         Session::flash(array_get($curConfig, "status_messages_key"), str_replace([":referenceCode"], [$this->payment->referenceCode], trans("paymentpass::services.{$this->service}.messages.{$this->payment->state}")));
                     }
                 } else {
-                    return $this->payment->payment_state;
+                    return response()->json($this->payment->payment_state, 201);
                 }
             } else {
                 if ($request->isMethod('get')) {
                     Session::flash(array_get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$request->get(array_get($curConfig, "service.$responseType.referenceCode"))], trans("paymentpass::messages.not_found")));
                 } else {
-                    return 'not_found';
+                    return response()->json('not_found', 200);
                 }
             }
-            return view(array_get($curConfig, "result_template", "paymentpass.result"), [
-                'user' => $request->user(),
-                'request' => $request,
-                'paymentPass' => $this->payment,
-                'config' => $curConfig,
-            ]);
+            if ($request->isMethod('get')) {
+                return response()->view(array_get($curConfig, "result_template", "paymentpass.result"), [
+                            'user' => $request->user(),
+                            'request' => $request,
+                            'paymentPass' => $this->payment,
+                            'config' => $curConfig,
+                                ], 200);
+            } else {
+                return response()->json('not_found', 200);
+            }
         }
     }
 
@@ -183,9 +187,9 @@ class PaymentPassHandler {
         if (stripos($parameter, "__request__")) {
             $parameter = str_replace("__request__", "", $parameter);
             $data = array_get($datos, $parameter, $parameter);
-            if (is_array($data) || is_object($data)){
+            if (is_array($data) || is_object($data)) {
                 return json_encode($data);
-            }else{
+            } else {
                 return $data;
             }
         }
@@ -304,7 +308,7 @@ class PaymentPassHandler {
             if ($createParameters == "") {
                 $objeto = new $className();
             } else {
-                $createParameters = $this->translate_parameters($createParameters,$curConfig, $data);
+                $createParameters = $this->translate_parameters($createParameters, $curConfig, $data);
                 $reflection = new \ReflectionClass($className);
                 $objeto = $reflection->newInstanceArgs($createParameters);
             }
@@ -330,8 +334,8 @@ class PaymentPassHandler {
             if ($callParameters == "") {
                 return call_user_func([$objeto, $functionName]);
             } else {
-                $callParameters = $this->translate_parameters($callParameters,$curConfig, $data);
-                return call_user_func([$objeto, $functionName],$callParameters);
+                $callParameters = $this->translate_parameters($callParameters, $curConfig, $data);
+                return call_user_func([$objeto, $functionName], $callParameters);
             }
         } else {
             return $objeto->{$functionName};
@@ -467,7 +471,7 @@ class PaymentPassHandler {
         }
         return $config;
     }
-    
+
     /**
      * Merge 2 configuration arrays, with $config as base and using $preConfig to overwrite.
      * 
