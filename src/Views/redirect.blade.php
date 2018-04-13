@@ -19,6 +19,7 @@
     </div>
     @endif
     <form method="{{array_get($config,"service.method")}}" action="{{array_get($config,"service.action")}}" id="paymentPassForm" name="paymentPassForm">
+        @if(array_get($config,"service.method") != "url")
         @if (array_get($config,"service.referenceCode.send",false))
         <input name="{{array_get($config,"service.referenceCode.field_name")}}" type="hidden"  value="{{array_get($config,"service.referenceCode.value")}}" >
         @endif
@@ -29,8 +30,23 @@
             <input name="{{array_get($response_datos,"url_field_name","")}}" type="hidden"  value="{{array_get($response_datos,"url","")}}" >
         @endforeach
         @foreach(array_get($config,"service.parameters",[]) as $parameter=>$value)
-        <input name="{{$parameter}}"    type="hidden"  value="{{$value}}"/>
+        @if (is_array($value))
+        <input name="{{$parameter}}" type="hidden"  value="{{json_encode($value)}}"/>
+        @else
+        <input name="{{$parameter}}" type="hidden"  value="{{$value}}"/>
+        @endif
         @endforeach
+        @else
+        <?php
+        $parts = parse_url(array_get($config,"service.action"));
+        parse_str($parts['query'], $query);
+        ?>
+        @if (is_array($query))
+        @foreach($query as $parameter=> $value)
+        <input name="{{$parameter}}" type="hidden"  value="{{$value}}"/>
+        @endforeach
+        @endif
+        @endif
         @if (!array_get($config,"production",true))
         <input name="Submit" class='btn btn-default' type="submit" value="Send"/>
         @endif

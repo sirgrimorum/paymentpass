@@ -24,21 +24,24 @@ return [
         'mercadopago' => [
             'type' => 'sdk', // type of service, default is 'normal', options are 'normal' or 'sdk' (need the sdk already installed)
             'action' => '', // where to redirect, if sdk type, ti will be overwritten
-            'method' => 'get', // method of the redirection
+            'method' => 'url', // method of the redirection, use url if no form is used
             'client_id' => '', // if necesary to be called using __config_paymentpass__ directive
             'client_secret' => '', // if necesary to be called using __config_paymentpass__ directive
             'pre_sdk'=>[ // things to do before in the sdk for type 'sdk'
-                '\MercadoPago\SDK'=>[ // class name as key
+                'setClientId'=>[ // only as reference
+                    'class' => '\MercadoPago\SDK', // class name as key
                     'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
                     'name' => 'setClientId', // name of the function/attribute to call
-                    'call_parameters' => '__service_parameters__client_id', // parameters to pass to the function, could be an array
+                    'call_parameters' => '__config_paymentpass__client_id', // parameters to pass to the function, could be an array
                 ],
-                '\MercadoPago\SDK'=>[
+                'setClientSecret'=>[
+                    'class' => '\MercadoPago\SDK', // class name as key
                     'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
                     'name' => 'setClientSecret', // name of the function/attribute to call
-                    'call_parameters' => '__service_parameters__client_secret', // parameters to pass to the function, could be an array
+                    'call_parameters' => '__config_paymentpass__client_secret', // parameters to pass to the function, could be an array
                 ],
-                '\Class\Name'=>[ //other calls
+                'other'=>[ //other calls
+                    'class' => '\Class\Name', // class name as key
                     'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
                     'name' => 'function', // name of the function/attribute to call
                     'create_parameters' => ['parameter'], // parameters for the creation of the class, for 'function' types,
@@ -48,7 +51,7 @@ return [
             'sdk_call'=>[ // get the redirect from the sdk for the 'sdk' type
                 'type' => 'attribute', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters),'attribute' (calls an attribute of the current 'sdk_call.class' object)
                 'class' => '\MercadoPago\Preference',
-                'create_parameters' => '__service_parameters_all__', // parameters to pass to de create, '__service_parameters_all__' pass the proccesed parameters array including the responses urls
+                'create_parameters' => ['__service_parameters_all__'], // parameters to pass to de create, '__service_parameters_all__' pass the proccesed parameters array including the responses urls
                 'pre_functions' =>[ //functions to call, in order, previus to the redirec function. 'name' is the name of the function, for non 'static' types
                     'save'=>'', // leave parameter empty for no parameters passed
                     'name'=>'parameter', // leave parameter empty for no parameters passed
@@ -62,7 +65,7 @@ return [
             ],
             'parameters' => [
                 'items' => [
-                    [0] => [
+                    0 => [
                         'id' => '__data__id_product',
                         'title' => '__data__product_name',
                         'description' => '__data__description',
@@ -116,21 +119,21 @@ return [
             'responses' => [ // type of responses to handle
                 'notification' => [ // how to map the PaymentPass model with the post or get data for this specifc response call
                     'url' => "", // url of the callback to this response, if blank or not present it will be route("paymentpass::response",["service"=>"this service","responseType"=>"this response type"], use: __route__ will evaluate route() and __url__ will evaluate url(), use , to separate parameters and json notation for array parameters
-                    'notification_url' => "back_urls.success", //name of the field name for the url to send in parameters
+                    'url_field_name' => "notification_url", //name of the field name for the url to send in parameters
                     '_pre'=>[ //things to do before to the save data, it will save each element acording to its name in order to be processed
                         'setClientId' => [ //for reference, not used
                             'key_name' => '', //name of the key to save the returned values, leave blank for not saving the returned value
                             'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
                             'class' => '\MercadoPago\SDK', // class name of the instance
                             'name' => 'setClientId', // name of the function/attribute to call
-                            'call_parameters' => '__service_parameters__client_id', // parameters to pass to the function, could be an array
+                            'call_parameters' => '__config_paymentpass__client_id', // parameters to pass to the function, could be an array
                         ],
                         'setClientSecret' => [ //for reference, not used
                             'key_name' => '', //name of the key to save the returned values, leave blank for not saving the returned value
                             'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
                             'class' => '\MercadoPago\SDK', // class name of the instance
                             'name' => 'setClientSecret', // name of the function/attribute to call
-                            'call_parameters' => '__service_parameters__client_secret', // parameters to pass to the function, could be an array
+                            'call_parameters' => '__config_paymentpass__client_secret', // parameters to pass to the function, could be an array
                         ],
                         'payment_info' => [ //for reference, not used
                             'key_name' => 'payment_info', //name of the key to save the returned values, leave blank for not saving the returned value

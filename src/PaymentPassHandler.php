@@ -73,12 +73,12 @@ class PaymentPassHandler {
      * @param string $service Optional The payment service to use
      * @return \Illuminate\View\View | \Illuminate\Contracts\View\Factory
      */
-    public function handleResponse(string $responseType, Request $request, string $service = "") {
+    public function handleResponse(Request $request, string $service = "",string $responseType) {
         if (in_array($service, config("sirgrimorum.paymentpass.available_services"))) {
             $this->service = $service;
             $this->config = $this->buildConfig();
         }
-        if ($responseType = "") {
+        if ($responseType == "") {
             if ($request->isMethod('get')) {
                 $responseType = 'response';
             } else {
@@ -106,12 +106,13 @@ class PaymentPassHandler {
             return view(array_get($curConfig, "result_template", "paymentpass.result"), [
                 'user' => $request->user(),
                 'request' => $request,
-                'paymentPass' => $this->payment
+                'paymentPass' => $this->payment,
+                'config' => $curConfig,
             ]);
         } else {
-            if ($this->getByReferencia($request->get(array_get($curConfig, "service.$responseType.referenceCode")))) {
+            if ($this->getByReferencia($request->get(array_get($curConfig, "service.responses.$responseType.referenceCode")))) {
                 $datos = $request->all();
-                $configResponse = array_get($curConfig, "service.$responseType");
+                $configResponse = array_get($curConfig, "service.responses.$responseType");
                 foreach (array_get($configResponse, "_pre", []) as $reference => $class_datos) {
                     $typeClass = $class_datos['type'];
                     $className = $class_datos['class'];
@@ -172,7 +173,8 @@ class PaymentPassHandler {
             return view(array_get($curConfig, "result_template", "paymentpass.result"), [
                 'user' => $request->user(),
                 'request' => $request,
-                'paymentPass' => $this->payment
+                'paymentPass' => $this->payment,
+                'config' => $curConfig,
             ]);
         }
     }
@@ -227,10 +229,10 @@ class PaymentPassHandler {
             }
         }
         if ($curConfig['service']['type'] == "sdk") {
-            $redirectUrl = route("paymentpass::response", ['service' => $curConfig['service'], 'responseType' => "error"]);
+            $redirectUrl = route("paymentpass::response", ['service' => $this->service, 'responseType' => "error"]);
             foreach (array_get($curConfig, "service.responses", []) as $responseName => $responseData) {
                 $responseUrl = array_get($responseData, "url", "");
-                if ($responseUrl == "") {
+                if ($responseUrl != "") {
                     data_set($curConfig, 'service.parameters.' . array_get($curConfig, "service.responses." . $responseName . ".url_field_name"), array_get($curConfig, "service.responses." . $responseName . ".url", ""));
                 }
             }
@@ -241,9 +243,9 @@ class PaymentPassHandler {
                 data_set($curConfig, 'service.parameters.' . array_get($curConfig, "service.signature.field_name"), array_get($curConfig, "service.signature.value", ""));
             }
             if (array_has($curConfig['service'], "pre_sdk")) {
-                foreach (array_get($curConfig, "service.pre_sdk", []) as $className => $class_datos) {
+                foreach (array_get($curConfig, "service.pre_sdk", []) as $refName => $class_datos) {
                     $this->callSdkFunction(
-                            $className, $class_datos['name'], $class_datos['type'], array_get($class_datos, 'create_parameters', ""), array_get($class_datos, 'call_parameters', ""), $curConfig, $data
+                            $class_datos['class'], $class_datos['name'], $class_datos['type'], array_get($class_datos, 'create_parameters', ""), array_get($class_datos, 'call_parameters', ""), $curConfig, $data
                     );
                 }
             }
@@ -255,7 +257,7 @@ class PaymentPassHandler {
                 $objeto = $this->getInstanceSdk($className, $typeCall, $createParameters, $curConfig, $data);
                 if (array_has($class_datos, "pre_functions")) {
                     foreach (array_get($class_datos, "pre_functions", []) as $functionName => $callParameters) {
-                        $this->callInstanceSdk($objeto, $typeCall, $functionName, $callParameters, $curConfig, $data);
+                        $this->callInstanceSdk($objeto, "function", $functionName, $callParameters, $curConfig, $data);
                     }
                 }
                 if (array_has($curConfig, "service.sdk_call.name")) {
@@ -302,8 +304,9 @@ class PaymentPassHandler {
             if ($createParameters == "") {
                 $objeto = new $className();
             } else {
+                $createParameters = $this->translate_parameters($createParameters,$curConfig, $data);
                 $reflection = new \ReflectionClass($className);
-                $objeto = $reflection->newInstanceArgs($this->translate_parameters($createParameters, $curConfig, $data));
+                $objeto = $reflection->newInstanceArgs($createParameters);
             }
         } else {
             $objeto = $className;
@@ -327,7 +330,8 @@ class PaymentPassHandler {
             if ($callParameters == "") {
                 return call_user_func([$objeto, $functionName]);
             } else {
-                return call_user_func([$objeto, $functionName], $this->translate_parameters($callParameters, $curConfig, $data));
+                $callParameters = $this->translate_parameters($callParameters,$curConfig, $data);
+                return call_user_func([$objeto, $functionName],$callParameters);
             }
         } else {
             return $objeto->{$functionName};
@@ -424,7 +428,7 @@ class PaymentPassHandler {
         if (array_get($curConfig, "service.referenceCode.type", "auto") == "auto") {
             $strHash = $referenceCode;
             $preHash = "";
-            foreach (array_get($curConfig, "service.referenceCode.fields", "~") as $parameter) {
+            foreach (array_get($curConfig, "service.referenceCode.fields", []) as $parameter) {
                 $strHash .= $preHash . $parameter;
                 $preHash = array_get($curConfig, "service.referenceCode.separator", "~");
             }
@@ -455,15 +459,87 @@ class PaymentPassHandler {
         $serviceProd = array_get($auxConfig, 'services_production.' . $this->service, []);
         if (!array_get($auxConfig, 'production', false)) {
             $serviceTest = array_get($auxConfig, 'services_test.' . $this->service, []);
-            $col = collect($serviceProd);
-            $col2 = $col->merge(collect($serviceTest));
-            $serviceProd = $col->toArray();
+            $serviceProd = $this->smartMergeConfig($serviceProd, $serviceTest);
         }
         $config['service'] = $serviceProd;
         if (!array_has($config['service'], "type")) {
             $config['service']['type'] = "normal";
         }
         return $config;
+    }
+    
+    /**
+     * Merge 2 configuration arrays, with $config as base and using $preConfig to overwrite.
+     * 
+     * A value of "notThisTime" in a field would mean that the field must be deleted
+     * 
+     * @param array $config The base configuration array
+     * @param array $preConfig The principal configuration array
+     * @return boolean|array The new configuration file
+     */
+    private function smartMergeConfig($config, $preConfig) {
+        if (is_array($preConfig)) {
+            if (is_array($config)) {
+                foreach ($preConfig as $key => $value) {
+                    if (!array_has($config, $key)) {
+                        if (is_array($value)) {
+                            if ($auxValue = $this->smartMergeConfig("", $value)) {
+                                $config[$key] = $auxValue;
+                            }
+                        } elseif (is_object($value)) {
+                            $config[$key] = $value;
+                        } elseif (strtolower($value) !== "notthistime") {
+                            $config[$key] = $value;
+                        }
+                    } else {
+                        if (is_array($value)) {
+                            if ($auxValue = $this->smartMergeConfig($config[$key], $value)) {
+                                $config[$key] = $auxValue;
+                            } else {
+                                unset($config[$key]);
+                            }
+                        } elseif (is_object($value)) {
+                            $config[$key] == $value;
+                        } elseif (strtolower($value) === "notthistime") {
+                            unset($config[$key]);
+                        } else {
+                            $config[$key] = $value;
+                        }
+                    }
+                }
+                if (count($config) > 0) {
+                    return $config;
+                } else {
+                    return false;
+                }
+            } else {
+                $config = [];
+                foreach ($preConfig as $key => $value) {
+                    if (is_array($value)) {
+                        if ($auxValue = $this->smartMergeConfig("", $value)) {
+                            $config[$key] = $auxValue;
+                        }
+                    } elseif (is_object($value)) {
+                        $config[$key] = $value;
+                    } elseif (strtolower($value) !== "notthistime") {
+                        $config[$key] = $value;
+                    }
+                }
+                if (count($config) > 0) {
+                    return $config;
+                } else {
+                    return false;
+                }
+            }
+        } elseif (is_object($preConfig)) {
+            return $preConfig;
+        } elseif (strtolower($preConfig) === "notthistime") {
+            return false;
+        } elseif (!$preConfig) {
+            return false;
+        } else {
+            return $preConfig;
+        }
     }
 
     /**
