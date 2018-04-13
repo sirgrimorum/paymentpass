@@ -110,7 +110,11 @@ class PaymentPassHandler {
                         'config' => $curConfig,
                             ], 200);
         } else {
-            if ($this->getByReferencia($request->get(array_get($curConfig, "service.responses.$responseType.referenceCode")))) {
+            $payment = $this->getByReferencia($request->get(array_get($curConfig, "service.responses.$responseType.referenceCode")));
+            if ($payment || (!array_get($curConfig,"production",false))) {
+                if (!$this->payment){
+                    $this->payment = new PaymentPass();
+                }
                 $datos = $request->all();
                 $configResponse = array_get($curConfig, "service.responses.$responseType");
                 foreach (array_get($configResponse, "_pre", []) as $reference => $class_datos) {
@@ -142,7 +146,13 @@ class PaymentPassHandler {
                     $this->payment->confirmation_date = now();
                     $this->payment->confirmation_data = $save_data;
                 }
-                $this->payment->save();
+                if (array_get($curConfig,"production",false)){
+                    $this->payment->save();
+                }else{
+                    if ($request->isMethod('get')) {
+                        echo "<p></p><pre>" . print_r(["datos"=>$datos,"Payment"=>$this->payment], true) . "</pre>";
+                    }
+                }
 
                 if (in_array($this->payment->state, array_get($curConfig, "service.state_codes.failure"))) {
                     $callbackFunc = array_get($curConfig, "service.callbacks.failure", "");
