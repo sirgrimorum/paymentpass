@@ -133,6 +133,11 @@ class PaymentPassHandler {
                     $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                 }
             }
+            if (!array_get($curConfig, "production", false)) {
+                if ($request->isMethod('get')) {
+                    echo "<p>lo que tengo</p><pre>" . print_r($datos, true) . "</pre>";
+                }
+            }
             $referenceCode = $this->getResponseParameter($datos, array_get($configResponse, "referenceCode", ""));
             $payment = $this->getByReferencia($referenceCode);
             if (!$payment) {
