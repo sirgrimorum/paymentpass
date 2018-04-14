@@ -141,7 +141,7 @@ class PaymentPassHandler {
                 $noexiste = false;
             }
             if ($payment || (!array_get($curConfig, "production", false))) {
-                if (!$this->payment) {
+                if ($noexiste) {
                     $this->payment = new PaymentPass();
                 }
                 if (!array_get($curConfig, "production", false)) {
