@@ -136,11 +136,11 @@ class PaymentPassHandler {
                 $state = $this->getResponseParameter($datos, array_get($configResponse, "state", ""));
                 $stateAux = $state;
                 if (array_has(array_get($curConfig, "service.state_codes.failure"), $stateAux)){
-                    $stateAux = array_get($curConfig, "service.state_codes.failure");
+                    $stateAux = array_get($curConfig, "service.state_codes.failure." . $stateAux);
                 }elseif(array_has(array_get($curConfig, "service.state_codes.pending"), $stateAux)){
-                    $stateAux = array_get($curConfig, "service.state_codes.pending");
+                    $stateAux = array_get($curConfig, "service.state_codes.pending." . $stateAux);
                 }elseif(array_has(array_get($curConfig, "service.state_codes.success"), $stateAux)){
-                    $stateAux = array_get($curConfig, "service.state_codes.success");
+                    $stateAux = array_get($curConfig, "service.state_codes.success." . $stateAux);
                 }
                 if (strlen($stateAux)>3){
                     $stateAux = substr($stateAux, 0, 3);
