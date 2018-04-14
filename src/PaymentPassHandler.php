@@ -30,7 +30,10 @@ class PaymentPassHandler {
     public function getByReferencia($referencia) {
         $este = $this;
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
-                    if ($this->isJsonString($paymentAux->creation_data)) {
+                if ($paymentAux->referenceCode == $referencia){
+                    return true;
+                }else{
+                    if ($este->isJsonString($paymentAux->creation_data)) {
                         $data = json_decode($paymentAux->creation_data, true);
                         if (!is_array($data)) {
                             $data = [];
@@ -39,6 +42,7 @@ class PaymentPassHandler {
                         $data = [];
                     }
                     return ($este->generateResponseCode($data, $paymentAux) == $referencia);
+                }
                 })->first();
         return $this->payment;
     }
@@ -141,7 +145,7 @@ class PaymentPassHandler {
             $payment = $this->getByReferencia($referenceCode);
             if (!array_get($curConfig, "production", false)) {
                 if ($request->isMethod('get')) {
-                    echo "<p>prueba</p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
+                    echo "<p>Inicio</p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
                 }
             }
             if (!$payment) {
@@ -211,7 +215,7 @@ class PaymentPassHandler {
                 }
                 if (!array_get($curConfig, "production", false)) {
                     if ($request->isMethod('get')) {
-                        echo "<p></p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
+                        echo "<p>Final</p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
                     }
                 }
 
