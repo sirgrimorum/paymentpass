@@ -133,7 +133,8 @@ class PaymentPassHandler {
                     $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                 }
             }
-            $payment = $this->getByReferencia(array_get($datos, array_get($configResponse, "referenceCode")));
+            $referenceCode = $this->getResponseParameter($datos, array_get($configResponse, "referenceCode", ""));
+            $payment = $this->getByReferencia($referenceCode);
             if (!$payment) {
                 $noexiste = true;
             } else {
