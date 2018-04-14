@@ -30,8 +30,12 @@ class PaymentPassHandler {
     public function getByReferencia($referencia) {
         $este = $this;
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
-                    $data = json_decode($paymentAux->creation_data, true);
-                    if (!$data) {
+                    if ($this->isJsonString($paymentAux->creation_data)) {
+                        $data = json_decode($paymentAux->creation_data, true);
+                        if (!$data) {
+                            $data = [];
+                        }
+                    } else {
                         $data = [];
                     }
                     return ($este->generateResponseCode($data, $paymentAux) == $referencia);
@@ -93,7 +97,7 @@ class PaymentPassHandler {
             $responseType = strtolower($responseType);
         }
         $curConfig = $this->config;
-        $curConfig = $this->translateConfig($request->all(), $curConfig, [], true);
+        $curConfig = $this->translateConfig([], $curConfig, [], false);
         if (!array_has($curConfig, "service.responses." . $responseType)) {
             $responseType = "error";
         }
@@ -133,11 +137,6 @@ class PaymentPassHandler {
                     $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                 }
             }
-            if (!array_get($curConfig, "production", false)) {
-                if ($request->isMethod('get')) {
-                    echo "<p>lo que tengo</p><pre>" . print_r($datos, true) . "</pre>";
-                }
-            }
             $referenceCode = $this->getResponseParameter($datos, array_get($configResponse, "referenceCode", ""));
             $payment = $this->getByReferencia($referenceCode);
             if (!$payment) {
@@ -148,6 +147,10 @@ class PaymentPassHandler {
             if ($payment || (!array_get($curConfig, "production", false))) {
                 if ($noexiste) {
                     $this->payment = new PaymentPass();
+                } else {
+                    if ($this->isJsonString($this->payment->creation_data)) {
+                        $curConfig = $this->translateConfig(json_decode($this->payment->creation_data, true), $curConfig, [], false);
+                    }
                 }
                 if (!array_get($curConfig, "production", false)) {
                     $datos['_responseType'] = $responseType;
@@ -196,7 +199,7 @@ class PaymentPassHandler {
                 }
                 if (!$noexiste) {
                     $this->payment->save();
-                }else{
+                } else {
                     $this->payment->save();
                 }
                 if (!array_get($curConfig, "production", false)) {
@@ -245,7 +248,7 @@ class PaymentPassHandler {
     }
 
     private function getResponseParameter($datos, $parameter) {
-        if (stripos($parameter, "__request__")) {
+        if (stripos($parameter, "__request__") !== false) {
             $parameter = str_replace("__request__", "", $parameter);
             $data = data_get($datos, $parameter, $parameter);
             if (is_array($data) || is_object($data)) {
@@ -537,6 +540,15 @@ class PaymentPassHandler {
             $config['service']['type'] = "normal";
         }
         return $config;
+    }
+
+    /**
+     * Evaluate if a string is a json
+     * @param string $json_string
+     * @return boolean
+     */
+    public function isJsonString($json_string) {
+        return !preg_match('/[^,:{}\\[\\]0-9.\\-+Eaeflnr-u \\n\\r\\t]/', preg_replace('/"(\\.|[^"\\\\])*"/', '', $json_string));
     }
 
     /**
