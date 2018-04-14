@@ -111,8 +111,8 @@ class PaymentPassHandler {
                             ], 200);
         } else {
             $payment = $this->getByReferencia($request->get(array_get($curConfig, "service.responses.$responseType.referenceCode")));
-            if ($payment || (!array_get($curConfig,"production",false))) {
-                if (!$this->payment){
+            if ($payment || (!array_get($curConfig, "production", false))) {
+                if (!$this->payment) {
                     $this->payment = new PaymentPass();
                 }
                 $datos = $request->all();
@@ -129,31 +129,43 @@ class PaymentPassHandler {
                         $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                     }
                 }
-                if (!array_get($curConfig,"production",false)){
+                if (!array_get($curConfig, "production", false)) {
                     $datos['_responseType'] = $responseType;
                     $datos['_service'] = $this->service;
                 }
-                $state = $this->getResponseParameter($datos, array_get($configResponse, "state", ""));
-                $stateAux = $state;
-                if (array_has(array_get($curConfig, "service.state_codes.failure"), $stateAux)){
-                    $stateAux = array_get($curConfig, "service.state_codes.failure." . $stateAux);
-                }elseif(array_has(array_get($curConfig, "service.state_codes.pending"), $stateAux)){
-                    $stateAux = array_get($curConfig, "service.state_codes.pending." . $stateAux);
-                }elseif(array_has(array_get($curConfig, "service.state_codes.success"), $stateAux)){
-                    $stateAux = array_get($curConfig, "service.state_codes.success." . $stateAux);
+                if (array_get($configResponse, "state", "") != "_notthistime") {
+                    $state = $this->getResponseParameter($datos, array_get($configResponse, "state", ""));
+                    $stateAux = $state;
+                    if (array_has(array_get($curConfig, "service.state_codes.failure"), $stateAux)) {
+                        $stateAux = array_get($curConfig, "service.state_codes.failure." . $stateAux);
+                    } elseif (array_has(array_get($curConfig, "service.state_codes.pending"), $stateAux)) {
+                        $stateAux = array_get($curConfig, "service.state_codes.pending." . $stateAux);
+                    } elseif (array_has(array_get($curConfig, "service.state_codes.success"), $stateAux)) {
+                        $stateAux = array_get($curConfig, "service.state_codes.success." . $stateAux);
+                    }
+                    if (strlen($stateAux) > 3) {
+                        $stateAux = substr($stateAux, 0, 3);
+                    }
+                    $this->payment->state = $stateAux;
                 }
-                if (strlen($stateAux)>3){
-                    $stateAux = substr($stateAux, 0, 3);
+                if (array_get($configResponse, "payment_method", "_notthistime") != "_notthistime") {
+                    $this->payment->payment_method = $this->getResponseParameter($datos, array_get($configResponse, "payment_method", ""));
                 }
-                $this->payment->state = $stateAux;
-                $this->payment->payment_method = $this->getResponseParameter($datos, array_get($configResponse, "payment_method", ""));
-                $this->payment->reference = $this->getResponseParameter($datos, array_get($configResponse, "reference", ""));
-                $this->payment->response = $this->getResponseParameter($datos, array_get($configResponse, "response", ""));
-                $this->payment->payment_state = $this->getResponseParameter($datos, array_get($configResponse, "payment_state", ""));
-                if (array_get($configResponse, "save_data", "__all__") == "__all__" || !is_array(array_get($configResponse, "save_data"))) {
-                    $save_data = json_encode($datos);
-                } else {
-                    $save_data = json_encode(array_only($datos, array_get($configResponse, "save_data")));
+                if (array_get($configResponse, "reference", "_notthistime") != "_notthistime") {
+                    $this->payment->reference = $this->getResponseParameter($datos, array_get($configResponse, "reference", ""));
+                }
+                if (array_get($configResponse, "response", "_notthistime") != "_notthistime") {
+                    $this->payment->response = $this->getResponseParameter($datos, array_get($configResponse, "response", ""));
+                }
+                if (array_get($configResponse, "payment_state", "_notthistime") != "_notthistime") {
+                    $this->payment->payment_state = $this->getResponseParameter($datos, array_get($configResponse, "payment_state", ""));
+                }
+                if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
+                    if (array_get($configResponse, "save_data", "__all__") == "__all__" || !is_array(array_get($configResponse, "save_data"))) {
+                        $save_data = json_encode($datos);
+                    } else {
+                        $save_data = json_encode(array_only($datos, array_get($configResponse, "save_data")));
+                    }
                 }
                 if ($responseType != 'confirmation') {
                     $this->payment->response_date = now();
@@ -163,9 +175,9 @@ class PaymentPassHandler {
                     $this->payment->confirmation_data = $save_data;
                 }
                 $this->payment->save();
-                if (!array_get($curConfig,"production",false)){
+                if (!array_get($curConfig, "production", false)) {
                     if ($request->isMethod('get')) {
-                        echo "<p></p><pre>" . print_r(["datos"=>$datos,"Payment"=>$this->payment], true) . "</pre>";
+                        echo "<p></p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
                     }
                 }
 
@@ -271,6 +283,9 @@ class PaymentPassHandler {
             if (array_get($curConfig, "service.signature.send", false)) {
                 data_set($curConfig, 'service.parameters.' . array_get($curConfig, "service.signature.field_name"), array_get($curConfig, "service.signature.value", ""));
             }
+            if (!array_get($curConfig, "production", false)) {
+                echo "<p>Lats_configuration pre_sdk</p><pre>" . print_r($curConfig, true) . "</pre>";
+            }
             if (array_has($curConfig['service'], "pre_sdk")) {
                 foreach (array_get($curConfig, "service.pre_sdk", []) as $refName => $class_datos) {
                     $this->callSdkFunction(
@@ -296,6 +311,9 @@ class PaymentPassHandler {
                 }
             }
             $curConfig['service']['action'] = $redirectUrl;
+        }
+        if (!array_get($curConfig, "production", false)) {
+            echo "<p>Last_configuration</p><pre>" . print_r($curConfig, true) . "</pre>";
         }
         return view('paymentpass::redirect', [
             'config' => $curConfig,
