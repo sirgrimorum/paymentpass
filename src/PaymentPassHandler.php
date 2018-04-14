@@ -139,6 +139,11 @@ class PaymentPassHandler {
             }
             $referenceCode = $this->getResponseParameter($datos, array_get($configResponse, "referenceCode", ""));
             $payment = $this->getByReferencia($referenceCode);
+            if (!array_get($curConfig, "production", false)) {
+                if ($request->isMethod('get')) {
+                    echo "<p></p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
+                }
+            }
             if (!$payment) {
                 $noexiste = true;
             } else {
@@ -183,19 +188,21 @@ class PaymentPassHandler {
                 if (array_get($configResponse, "payment_state", "_notthistime") != "_notthistime") {
                     $this->payment->payment_state = $this->getResponseParameter($datos, array_get($configResponse, "payment_state", ""));
                 }
-                if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
-                    if (array_get($configResponse, "save_data", "__all__") == "__all__" || !is_array(array_get($configResponse, "save_data"))) {
-                        $save_data = json_encode($datos);
-                    } else {
-                        $save_data = json_encode(array_only($datos, array_get($configResponse, "save_data")));
-                    }
+                if (array_get($configResponse, "save_data", "__all__") == "__all__" || !is_array(array_get($configResponse, "save_data"))) {
+                    $save_data = json_encode($datos);
+                } else {
+                    $save_data = json_encode(array_only($datos, array_get($configResponse, "save_data")));
                 }
                 if ($responseType != 'confirmation') {
                     $this->payment->response_date = now();
-                    $this->payment->response_data = $save_data;
+                    if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
+                        $this->payment->response_data = $save_data;
+                    }
                 } else {
                     $this->payment->confirmation_date = now();
-                    $this->payment->confirmation_data = $save_data;
+                    if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
+                        $this->payment->confirmation_data = $save_data;
+                    }
                 }
                 if (!$noexiste) {
                     $this->payment->save();
