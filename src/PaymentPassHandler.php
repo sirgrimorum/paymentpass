@@ -30,7 +30,8 @@ class PaymentPassHandler {
     public function getByReferencia($referencia) {
         $este = $this;
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
-                    return ($este->generateResponseCode([], $paymentAux) == $referencia);
+                    $data = json_decode($paymentAux->creation_data, true);
+                    return ($este->generateResponseCode($data, $paymentAux) == $referencia);
                 })->first();
         return $this->payment;
     }
@@ -61,6 +62,7 @@ class PaymentPassHandler {
         $payment->save();
         $this->payment = $payment;
         $this->payment->referenceCode = $this->generateResponseCode($data);
+        $this->payment->creation_data = json_encode($data);
         $this->payment->save();
         return $this->payment;
     }
@@ -110,24 +112,28 @@ class PaymentPassHandler {
                         'config' => $curConfig,
                             ], 200);
         } else {
-            $payment = $this->getByReferencia($request->get(array_get($curConfig, "service.responses.$responseType.referenceCode")));
+            $datos = $request->all();
+            $configResponse = array_get($curConfig, "service.responses.$responseType");
+            foreach (array_get($configResponse, "_pre", []) as $reference => $class_datos) {
+                $typeClass = $class_datos['type'];
+                $className = $class_datos['class'];
+                $functionName = $class_datos['name'];
+                $createParameters = array_get($class_datos, "create_parameters", "");
+                $callParameters = array_get($class_datos, "call_parameters", "");
+                if (array_get($class_datos, "key_name", "") != "") {
+                    $auxDatos = $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
+                    if (is_array($auxDatos) || is_object($auxDatos)){
+                        $auxDatos = json_decode(json_encode($auxDatos),true);
+                    }
+                    data_set($datos, $class_datos['key_name'], $auxDatos);
+                } else {
+                    $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
+                }
+            }
+            $payment = $this->getByReferencia(array_get($datos,array_get($configResponse, "referenceCode")));
             if ($payment || (!array_get($curConfig, "production", false))) {
                 if (!$this->payment) {
                     $this->payment = new PaymentPass();
-                }
-                $datos = $request->all();
-                $configResponse = array_get($curConfig, "service.responses.$responseType");
-                foreach (array_get($configResponse, "_pre", []) as $reference => $class_datos) {
-                    $typeClass = $class_datos['type'];
-                    $className = $class_datos['class'];
-                    $functionName = $class_datos['name'];
-                    $createParameters = array_get($class_datos, "create_parameters", "");
-                    $callParameters = array_get($class_datos, "call_parameters", "");
-                    if (array_get($class_datos, "key_name", "") != "") {
-                        data_set($datos, $class_datos['key_name'], $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos));
-                    } else {
-                        $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
-                    }
                 }
                 if (!array_get($curConfig, "production", false)) {
                     $datos['_responseType'] = $responseType;
