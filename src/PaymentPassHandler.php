@@ -133,7 +133,19 @@ class PaymentPassHandler {
                     $datos['_responseType'] = $responseType;
                     $datos['_service'] = $this->service;
                 }
-                $this->payment->state = $this->getResponseParameter($datos, array_get($configResponse, "state", ""));
+                $state = $this->getResponseParameter($datos, array_get($configResponse, "state", ""));
+                $stateAux = $state;
+                if (array_has(array_get($curConfig, "service.state_codes.failure"), $stateAux)){
+                    $stateAux = array_get($curConfig, "service.state_codes.failure");
+                }elseif(array_has(array_get($curConfig, "service.state_codes.pending"), $stateAux)){
+                    $stateAux = array_get($curConfig, "service.state_codes.pending");
+                }elseif(array_has(array_get($curConfig, "service.state_codes.success"), $stateAux)){
+                    $stateAux = array_get($curConfig, "service.state_codes.success");
+                }
+                if (strlen($stateAux)>3){
+                    $stateAux = substr($stateAux, 0, 3);
+                }
+                $this->payment->state = $stateAux;
                 $this->payment->payment_method = $this->getResponseParameter($datos, array_get($configResponse, "payment_method", ""));
                 $this->payment->reference = $this->getResponseParameter($datos, array_get($configResponse, "reference", ""));
                 $this->payment->response = $this->getResponseParameter($datos, array_get($configResponse, "response", ""));
@@ -157,9 +169,9 @@ class PaymentPassHandler {
                     }
                 }
 
-                if (in_array($this->payment->state, array_get($curConfig, "service.state_codes.failure"))) {
+                if (in_array($state, array_get($curConfig, "service.state_codes.failure")) || array_has(array_get($curConfig, "service.state_codes.failure"), $state)) {
                     $callbackFunc = array_get($curConfig, "service.callbacks.failure", "");
-                } elseif (in_array($this->payment->state, array_get($curConfig, "service.state_codes.success"))) {
+                } elseif (in_array($state, array_get($curConfig, "service.state_codes.success")) || array_has(array_get($curConfig, "service.state_codes.success"), $state)) {
                     $callbackFunc = array_get($curConfig, "service.callbacks.success", "");
                 } else {
                     $callbackFunc = array_get($curConfig, "service.callbacks.other", "");

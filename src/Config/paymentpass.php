@@ -185,8 +185,21 @@ return [
                 ],
             ],
             'state_codes' => [ // the ones returned from the paymen services asigned to 'state' field
-                'success' => ["4"],
-                'failure' => ["5","6","104"],
+                'success' => [
+                    "approved" => "apr", // the state field in the bd is 3 varchar long, so the data must be truncated, the key is the value returned and the value is the one saved to the bd
+                    "authorized" => "aut"
+                ], 
+                'failure' => [
+                    "rejected" => "rej",
+                    "cancelled" => "can",
+                    "refunded" => "ref",
+                    "charged_back" => "cha",
+                    "in_mediation" => "inm"
+                ],
+                'pending' => [
+                    'in_process' => "inp",
+                    "pending" => "pen"
+                ]
             ],
             'callbacks' => [ //to be called in the response and/or confirmation calls from the payment service depending on the state_code results
                 'success' => function($paymentpass){
