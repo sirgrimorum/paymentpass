@@ -32,7 +32,7 @@ class PaymentPassHandler {
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
                     if ($this->isJsonString($paymentAux->creation_data)) {
                         $data = json_decode($paymentAux->creation_data, true);
-                        if (!$data) {
+                        if (!is_array($data)) {
                             $data = [];
                         }
                     } else {
@@ -141,7 +141,7 @@ class PaymentPassHandler {
             $payment = $this->getByReferencia($referenceCode);
             if (!array_get($curConfig, "production", false)) {
                 if ($request->isMethod('get')) {
-                    echo "<p></p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
+                    echo "<p>prueba</p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
                 }
             }
             if (!$payment) {
