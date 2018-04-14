@@ -191,6 +191,8 @@ class PaymentPassHandler {
                 }
                 if (!$noexiste) {
                     $this->payment->save();
+                }else{
+                    $this->payment->save();
                 }
                 if (!array_get($curConfig, "production", false)) {
                     if ($request->isMethod('get')) {
