@@ -129,6 +129,10 @@ class PaymentPassHandler {
                         $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                     }
                 }
+                if (!array_get($curConfig,"production",false)){
+                    $datos['_responseType'] = $responseType;
+                    $datos['_service'] = $this->service;
+                }
                 $this->payment->state = $this->getResponseParameter($datos, array_get($configResponse, "state", ""));
                 $this->payment->payment_method = $this->getResponseParameter($datos, array_get($configResponse, "payment_method", ""));
                 $this->payment->reference = $this->getResponseParameter($datos, array_get($configResponse, "reference", ""));
@@ -146,9 +150,8 @@ class PaymentPassHandler {
                     $this->payment->confirmation_date = now();
                     $this->payment->confirmation_data = $save_data;
                 }
-                if (array_get($curConfig,"production",false)){
-                    $this->payment->save();
-                }else{
+                $this->payment->save();
+                if (!array_get($curConfig,"production",false)){
                     if ($request->isMethod('get')) {
                         echo "<p></p><pre>" . print_r(["datos"=>$datos,"Payment"=>$this->payment], true) . "</pre>";
                     }
