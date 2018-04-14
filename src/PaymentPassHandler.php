@@ -31,6 +31,9 @@ class PaymentPassHandler {
         $este = $this;
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
                     $data = json_decode($paymentAux->creation_data, true);
+                    if (!$data) {
+                        $data = [];
+                    }
                     return ($este->generateResponseCode($data, $paymentAux) == $referencia);
                 })->first();
         return $this->payment;
@@ -122,15 +125,20 @@ class PaymentPassHandler {
                 $callParameters = array_get($class_datos, "call_parameters", "");
                 if (array_get($class_datos, "key_name", "") != "") {
                     $auxDatos = $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
-                    if (is_array($auxDatos) || is_object($auxDatos)){
-                        $auxDatos = json_decode(json_encode($auxDatos),true);
+                    if (is_array($auxDatos) || is_object($auxDatos)) {
+                        $auxDatos = json_decode(json_encode($auxDatos), true);
                     }
                     data_set($datos, $class_datos['key_name'], $auxDatos);
                 } else {
                     $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                 }
             }
-            $payment = $this->getByReferencia(array_get($datos,array_get($configResponse, "referenceCode")));
+            $payment = $this->getByReferencia(array_get($datos, array_get($configResponse, "referenceCode")));
+            if (!$payment) {
+                $noexiste = true;
+            } else {
+                $noexiste = false;
+            }
             if ($payment || (!array_get($curConfig, "production", false))) {
                 if (!$this->payment) {
                     $this->payment = new PaymentPass();
@@ -180,7 +188,9 @@ class PaymentPassHandler {
                     $this->payment->confirmation_date = now();
                     $this->payment->confirmation_data = $save_data;
                 }
-                $this->payment->save();
+                if (!$noexiste) {
+                    $this->payment->save();
+                }
                 if (!array_get($curConfig, "production", false)) {
                     if ($request->isMethod('get')) {
                         echo "<p></p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
