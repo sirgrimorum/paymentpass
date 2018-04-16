@@ -30,10 +30,7 @@ class PaymentPassHandler {
     public function getByReferencia($referencia) {
         $este = $this;
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
-                if ($paymentAux->referenceCode == $referencia){
-                    return true;
-                }else{
-                    if ($este->isJsonString($paymentAux->creation_data)) {
+                    if ($this->isJsonString($paymentAux->creation_data)) {
                         $data = json_decode($paymentAux->creation_data, true);
                         if (!is_array($data)) {
                             $data = [];
@@ -42,7 +39,6 @@ class PaymentPassHandler {
                         $data = [];
                     }
                     return ($este->generateResponseCode($data, $paymentAux) == $referencia);
-                }
                 })->first();
         return $this->payment;
     }
@@ -143,9 +139,9 @@ class PaymentPassHandler {
             }
             $referenceCode = $this->getResponseParameter($datos, array_get($configResponse, "referenceCode", ""));
             $payment = $this->getByReferencia($referenceCode);
-            if (!array_get($curConfig, "production", false)) {
+            if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
                 if ($request->isMethod('get')) {
-                    echo "<p>Inicio</p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
+                    echo "<p>prueba</p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
                 }
             }
             if (!$payment) {
@@ -213,9 +209,9 @@ class PaymentPassHandler {
                 } else {
                     $this->payment->save();
                 }
-                if (!array_get($curConfig, "production", false)) {
+                if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
                     if ($request->isMethod('get')) {
-                        echo "<p>Final</p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
+                        echo "<p></p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
                     }
                 }
 
@@ -321,7 +317,7 @@ class PaymentPassHandler {
             if (array_get($curConfig, "service.signature.send", false)) {
                 data_set($curConfig, 'service.parameters.' . array_get($curConfig, "service.signature.field_name"), array_get($curConfig, "service.signature.value", ""));
             }
-            if (!array_get($curConfig, "production", false)) {
+            if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
                 echo "<p>Lats_configuration pre_sdk</p><pre>" . print_r($curConfig, true) . "</pre>";
             }
             if (array_has($curConfig['service'], "pre_sdk")) {
@@ -350,7 +346,7 @@ class PaymentPassHandler {
             }
             $curConfig['service']['action'] = $redirectUrl;
         }
-        if (!array_get($curConfig, "production", false)) {
+        if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
             echo "<p>Last_configuration</p><pre>" . print_r($curConfig, true) . "</pre>";
         }
         return view('paymentpass::redirect', [

@@ -19,6 +19,7 @@ return [
     'result_post_html' => '', // html to insert after the container div in the result view
     'available_services' => ['payu'],
     'production' => false,
+    'mostrarEchos' => false,
     'result_template' => 'paymentpass::result', // blade template to show in the result
     'services_production' => [ // original configuration for the services, test mode will overwrite this with the services_test configurations
         'mercadopago' => [

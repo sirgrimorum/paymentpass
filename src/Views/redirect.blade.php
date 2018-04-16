@@ -39,6 +39,7 @@
         @else
         <?php
         $parts = parse_url(array_get($config,"service.action"));
+        if (array_has($parts,"query")){
         parse_str($parts['query'], $query);
         ?>
         @if (is_array($query))
@@ -46,6 +47,9 @@
         <input name="{{$parameter}}" type="hidden"  value="{{$value}}"/>
         @endforeach
         @endif
+        <?php
+        }
+        ?>
         @endif
         @if (!array_get($config,"production",true))
         <input name="Submit" class='btn btn-default' type="submit" value="Send"/>
