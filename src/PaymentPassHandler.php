@@ -358,14 +358,54 @@ class PaymentPassHandler {
             ]);
         } else {
             $result = new \stdClass;
-            //$result->config = $curConfig;
+            $result->redirect = json_decode($this->getJsonView($curConfig, $data));
             $result->data = $data;
-            $result->redirect = json_encode(view('paymentpass::redirectjson', [
-                'config' => $curConfig,
-                'datos' => $data,
-            ])->render());
+            $result->config = json_decode(json_encode($curConfig));
             return response()->json($result, 200);
         }
+    }
+    
+    /**
+     * Get the data from the view as a json
+     * @param array $config Configuration array
+     * @param array $datos Data
+     * @return string
+     */
+    private function getJsonView($config, $datos) {
+        $return = [
+            "action" => array_get($config, "service.action"),
+            "method" => array_get($config, "service.method"),
+        ];
+        $return["parameters"] = [];
+        if (array_get($config, "service.method") != "url") {
+            if (array_get($config, "service.referenceCode.send", false)) {
+                $return["parameters"][array_get($config, "service.referenceCode.field_name")] = array_get($config, "service.referenceCode.value");
+            }
+            if (array_get($config, "service.signature.send", false)) {
+                $return["parameters"][array_get($config, "service.signature.field_name")] = array_get($config, "service.signature.value");
+            }
+            foreach (array_get($config, "service.responses", []) as $response_name => $response_datos) {
+                $return["parameters"][array_get($response_datos, "url_field_name", "")] = array_get($response_datos, "url", "");
+            }
+            foreach (array_get($config, "service.parameters", []) as $parameter => $value) {
+                if (is_array($value)) {
+                    $return["parameters"][$parameter] = json_encode($value);
+                } else {
+                    $return["parameters"][$parameter] = $value;
+                }
+            }
+        } else {
+            $parts = parse_url(array_get($config, "service.action"));
+            if (array_has($parts, "query")) {
+                parse_str($parts['query'], $query);
+                if (is_array($query)) {
+                    foreach ($query as $parameter => $value) {
+                        $return["parameters"][$parameter] = $value;
+                    }
+                }
+            }
+        }
+        return json_encode($return);
     }
 
     /**
