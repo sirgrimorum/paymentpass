@@ -207,7 +207,9 @@ class PaymentPassHandler {
                 if (!$noexiste) {
                     $this->payment->save();
                 } else {
-                    $this->payment->save();
+                    if (array_get($curConfig, "saveAll", false)) {
+                        $this->payment->save();
+                    }
                 }
                 if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
                     if ($request->isMethod('get')) {
@@ -364,7 +366,7 @@ class PaymentPassHandler {
             return response()->json($result, 200);
         }
     }
-    
+
     /**
      * Get the data from the view as a json
      * @param array $config Configuration array
