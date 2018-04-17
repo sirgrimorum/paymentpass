@@ -358,12 +358,13 @@ class PaymentPassHandler {
             ]);
         } else {
             $result = new \stdClass;
-            $result->config = $curConfig;
+            //$result->config = $curConfig;
             $result->data = $data;
             $result->redirect = json_encode(view('paymentpass::redirectjson', [
                 'config' => $curConfig,
                 'datos' => $data,
             ])->render());
+            return response()->json($result, 200);
         }
     }
 
