@@ -30,7 +30,7 @@ class PaymentPassHandler {
     public function getByReferencia($referencia) {
         $este = $this;
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
-                    if ($this->isJsonString($paymentAux->creation_data)) {
+                    if ($este->isJsonString($paymentAux->creation_data)) {
                         $data = json_decode($paymentAux->creation_data, true);
                         if (!is_array($data)) {
                             $data = [];
