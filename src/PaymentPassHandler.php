@@ -360,7 +360,7 @@ class PaymentPassHandler {
             $result = new \stdClass;
             $result->config = $curConfig;
             $result->data = $data;
-            $result->redirect = json_encode(view('paymentpass::redirectjoson', [
+            $result->redirect = json_encode(view('paymentpass::redirectjson', [
                 'config' => $curConfig,
                 'datos' => $data,
             ])->render());
