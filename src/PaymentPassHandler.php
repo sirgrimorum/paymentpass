@@ -347,11 +347,11 @@ class PaymentPassHandler {
             $curConfig['service']['action'] = $redirectUrl;
         }
         if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
-            if ($request->isMethod('get')) {
+            if (!request()->wantsJson()) {
                 echo "<p>Last_configuration</p><pre>" . print_r($curConfig, true) . "</pre>";
             }
         }
-        if ($request->isMethod('get')) {
+        if (!request()->wantsJson()) {
             return view('paymentpass::redirect', [
                 'config' => $curConfig,
                 'datos' => $data,
