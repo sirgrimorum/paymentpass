@@ -347,12 +347,24 @@ class PaymentPassHandler {
             $curConfig['service']['action'] = $redirectUrl;
         }
         if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
-            echo "<p>Last_configuration</p><pre>" . print_r($curConfig, true) . "</pre>";
+            if ($request->isMethod('get')) {
+                echo "<p>Last_configuration</p><pre>" . print_r($curConfig, true) . "</pre>";
+            }
         }
-        return view('paymentpass::redirect', [
-            'config' => $curConfig,
-            'datos' => $data,
-        ]);
+        if ($request->isMethod('get')) {
+            return view('paymentpass::redirect', [
+                'config' => $curConfig,
+                'datos' => $data,
+            ]);
+        } else {
+            $result = new \stdClass;
+            $result->config = $curConfig;
+            $result->data = $data;
+            $result->redirect = json_encode(view('paymentpass::redirectjoson', [
+                'config' => $curConfig,
+                'datos' => $data,
+            ])->render());
+        }
     }
 
     /**
