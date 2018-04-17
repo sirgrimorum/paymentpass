@@ -30,15 +30,19 @@ class PaymentPassHandler {
     public function getByReferencia($referencia) {
         $este = $this;
         $this->payment = PaymentPass::all()->filter(function($paymentAux) use ($referencia, $este) {
-                    if ($este->isJsonString($paymentAux->creation_data)) {
-                        $data = json_decode($paymentAux->creation_data, true);
-                        if (!is_array($data)) {
+                    if ($paymentAux->referenceCode == $referencia) {
+                        return true;
+                    } else {
+                        if ($este->isJsonString($paymentAux->creation_data)) {
+                            $data = json_decode($paymentAux->creation_data, true);
+                            if (!is_array($data)) {
+                                $data = [];
+                            }
+                        } else {
                             $data = [];
                         }
-                    } else {
-                        $data = [];
+                        return ($este->generateResponseCode($data, $paymentAux) == $referencia);
                     }
-                    return ($este->generateResponseCode($data, $paymentAux) == $referencia);
                 })->first();
         return $this->payment;
     }
@@ -57,13 +61,17 @@ class PaymentPassHandler {
      * Store a transaction request
      * @param int $process_id unsigned, the id of the parent process for the transaction request
      * @param array $data The data information needed to process the store
+     * @param string $type Optional The type of the transaction
      * @return \Sirgrimorum\PaymentPass\Models\PaymentPass the saved transaction request
      */
-    public function store($process_id, array $data) {
+    public function store($process_id, array $data, $type = "") {
         if ($this->payment) {
             $payment = $this->payment;
         } else {
             $payment = new PaymentPass();
+        }
+        if ($type != "") {
+            $payment->type = substr($type, 0,3);
         }
         $payment->process_id = $process_id;
         $payment->save();
@@ -122,22 +130,27 @@ class PaymentPassHandler {
             $datos = $request->all();
             $configResponse = array_get($curConfig, "service.responses.$responseType");
             foreach (array_get($configResponse, "_pre", []) as $reference => $class_datos) {
-                $typeClass = $class_datos['type'];
-                $className = $class_datos['class'];
-                $functionName = $class_datos['name'];
-                $createParameters = array_get($class_datos, "create_parameters", "");
-                $callParameters = array_get($class_datos, "call_parameters", "");
-                if (array_get($class_datos, "key_name", "") != "") {
-                    $auxDatos = $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
-                    if (is_array($auxDatos) || is_object($auxDatos)) {
-                        $auxDatos = json_decode(json_encode($auxDatos), true);
+                if ($this->conditionsFunction(array_get($class_datos, "if", []), $curConfig, $datos)) {
+                    $typeClass = $class_datos['type'];
+                    $className = $class_datos['class'];
+                    $functionName = $class_datos['name'];
+                    $createParameters = array_get($class_datos, "create_parameters", "");
+                    $callParameters = array_get($class_datos, "call_parameters", "");
+                    if (array_get($class_datos, "key_name", "") != "") {
+                        $auxDatos = $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
+                        if (is_array($auxDatos) || is_object($auxDatos)) {
+                            $auxDatos = json_decode(json_encode($auxDatos), true);
+                            if (array_has($auxDatos, "body")) {
+                                $auxDatos = array_get($auxDatos, "body");
+                            }
+                        }
+                        data_set($datos, $class_datos['key_name'], $auxDatos);
+                    } else {
+                        $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                     }
-                    data_set($datos, $class_datos['key_name'], $auxDatos);
-                } else {
-                    $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                 }
             }
-            $referenceCode = $this->getResponseParameter($datos, array_get($configResponse, "referenceCode", ""));
+            $referenceCode = $this->getResponseParameter(array_get($configResponse, "referenceCode", ""), $curConfig, $datos);
             $payment = $this->getByReferencia($referenceCode);
             if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
                 if ($request->isMethod('get')) {
@@ -162,7 +175,7 @@ class PaymentPassHandler {
                     $datos['_service'] = $this->service;
                 }
                 if (array_get($configResponse, "state", "") != "_notthistime") {
-                    $state = $this->getResponseParameter($datos, array_get($configResponse, "state", ""));
+                    $state = $this->getResponseParameter(array_get($configResponse, "state", ""), $curConfig, $datos);
                     $stateAux = $state;
                     if (array_has(array_get($curConfig, "service.state_codes.failure"), $stateAux)) {
                         $stateAux = array_get($curConfig, "service.state_codes.failure." . $stateAux);
@@ -177,30 +190,42 @@ class PaymentPassHandler {
                     $this->payment->state = $stateAux;
                 }
                 if (array_get($configResponse, "payment_method", "_notthistime") != "_notthistime") {
-                    $this->payment->payment_method = $this->getResponseParameter($datos, array_get($configResponse, "payment_method", ""));
+                    $this->payment->payment_method = $this->getResponseParameter(array_get($configResponse, "payment_method", ""), $curConfig, $datos);
                 }
                 if (array_get($configResponse, "reference", "_notthistime") != "_notthistime") {
-                    $this->payment->reference = $this->getResponseParameter($datos, array_get($configResponse, "reference", ""));
+                    $this->payment->reference = $this->getResponseParameter(array_get($configResponse, "reference", ""), $curConfig, $datos);
                 }
                 if (array_get($configResponse, "response", "_notthistime") != "_notthistime") {
-                    $this->payment->response = $this->getResponseParameter($datos, array_get($configResponse, "response", ""));
+                    $this->payment->response = $this->getResponseParameter(array_get($configResponse, "response", ""), $curConfig, $datos);
                 }
                 if (array_get($configResponse, "payment_state", "_notthistime") != "_notthistime") {
-                    $this->payment->payment_state = $this->getResponseParameter($datos, array_get($configResponse, "payment_state", ""));
+                    $this->payment->payment_state = $this->getResponseParameter(array_get($configResponse, "payment_state", ""), $curConfig, $datos);
                 }
                 if (array_get($configResponse, "save_data", "__all__") == "__all__" || !is_array(array_get($configResponse, "save_data"))) {
                     $save_data = json_encode($datos);
                 } else {
                     $save_data = json_encode(array_only($datos, array_get($configResponse, "save_data")));
                 }
-                if ($responseType != 'confirmation') {
+                if (!$request->isMethod('get')) {
                     $this->payment->response_date = now();
                     if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
+                        if ($this->payment->response_data != null){
+                            $auxData = json_decode($this->payment->response_data, true);
+                            if (is_array($auxData)){
+                                $save_data = json_encode(array_merge($auxData,  json_decode($save_data,true)));
+                            }
+                        }
                         $this->payment->response_data = $save_data;
                     }
                 } else {
                     $this->payment->confirmation_date = now();
                     if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
+                        if ($this->payment->confirmation_data != null){
+                            $auxData = json_decode($this->payment->confirmation_data, true);
+                            if (is_array($auxData)){
+                                $save_data = json_encode(array_merge($auxData,  json_decode($save_data,true)));
+                            }
+                        }
                         $this->payment->confirmation_data = $save_data;
                     }
                 }
@@ -256,11 +281,71 @@ class PaymentPassHandler {
         }
     }
 
-    private function getResponseParameter($datos, $parameter) {
-        if (stripos($parameter, "__request__") !== false) {
-            $parameter = str_replace("__request__", "", $parameter);
+    /**
+     * Evaluates the conditions of a function given an array of conditions
+     * @param array $ifs Conditions
+     * @param array $config Configuration array
+     * @param array $datos Data to evlauate
+     * @return boolean
+     */
+    private function conditionsFunction($ifs, $config, $datos) {
+        if (is_array($ifs)) {
+            foreach ($ifs as $if) {
+                $value1 = array_get($if, "value1", "");
+                $value1 = $this->translate_parameters($value1, $config, $datos);
+                $value2 = array_get($if, "value2", "");
+                $value2 = $this->translate_parameters($value2, $config, $datos);
+                $condition = array_get("if", "condition", "=");
+                switch ($condition) {
+                    case "=":
+                        if ($value1 != $value2) {
+                            return false;
+                        }
+                        break;
+                    case "!=":
+                        if ($value1 == $value2) {
+                            return false;
+                        }
+                        break;
+                    case ">":
+                        if ($value1 <= $value2) {
+                            return false;
+                        }
+                        break;
+                    case "<":
+                        if ($value1 >= $value2) {
+                            return false;
+                        }
+                        break;
+                    case ">=":
+                        if ($value1 < $value2) {
+                            return false;
+                        }
+                        break;
+                    case "<=":
+                        if ($value1 > $value2) {
+                            return false;
+                        }
+                        break;
+                }
+            }
         }
-        $data = data_get($datos, $parameter, $parameter);
+        return true;
+    }
+
+    /**
+     * Get the parameters from a response
+     * @param string $parameter Parameter, could nedd translation
+     * @param array $config Configuration array
+     * @param arrya $datos Data to evaluate
+     * @return string
+     */
+    private function getResponseParameter($parameter, $config, $datos) {
+        /* if (stripos($parameter, "__request__") !== false) {
+          $parameter = str_replace("__request__", "", $parameter);
+          }
+          $data = data_get($datos, $parameter, $parameter); */
+        $data = $this->translate_parameters($parameter, $config, $datos);
         if (is_array($data) || is_object($data)) {
             return json_encode($data);
         } else {

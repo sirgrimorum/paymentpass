@@ -122,7 +122,33 @@ return [
                 'notification' => [ // how to map the PaymentPass model with the post or get data for this specifc response call
                     'url' => "", // url of the callback to this response, if blank or not present it will be route("paymentpass::response",["service"=>"this service","responseType"=>"this response type"], use: __route__ will evaluate route() and __url__ will evaluate url(), use , to separate parameters and json notation for array parameters
                     'url_field_name' => "notification_url", //name of the field name for the url to send in parameters
-                    '_pre'=>[ //things to do before to the save data, it will save each element acording to its name in order to be processed
+                    'setAccessToken' => [ //for reference, not used
+                            'key_name' => '', //name of the key to save the returned values, leave blank for not saving the returned value
+                            'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
+                            'class' => '\MercadoPago\SDK', // class name of the instance
+                            'name' => 'setAccessToken', // name of the function/attribute to call
+                            'call_parameters' => '__config_paymentpass__access_token', // parameters to pass to the function, could be an array
+                        ],
+                        'payment_info' => [ //for reference, not used
+                          'key_name' => 'payment_info', //name of the key to save the returned values, leave blank for not saving the returned value
+                          'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
+                          'class' => '\MercadoPago\SDK', // class name of the instance
+                          'name' => 'get', // name of the function/attribute to call
+                          'create_parameters' => '', // parameters for the creation of the class, for 'function' types, could be an array, use __request__ for request data
+                          'call_parameters' => '/v1/payments/__request__data_id', // parameters to pass to the function, could be an array, use __data__ for request data
+                            'if'=>[ //conditional, only executes if is all the conditions are fullfilled
+                                ['value1'=>'__request__type', //first value to compare, default ""
+                                'condition'=>'=', // comparision, default "=", options are: "=","!=","<",">","<=",">="
+                                'value2'=>'payment'], // second value to compare, default ""
+                            ]
+                          ],
+                        'initialize' => [ //for reference, not used
+                            'key_name' => '', //name of the key to save the returned values, leave blank for not saving the returned value
+                            'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
+                            'class' => '\MercadoPago\SDK', // class name of the instance
+                            'name' => 'initialize', // name of the function/attribute to call
+                            'call_parameters' => '', // parameters to pass to the function, could be an array
+                        ],
                         'setClientId' => [ //for reference, not used
                             'key_name' => '', //name of the key to save the returned values, leave blank for not saving the returned value
                             'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
@@ -137,30 +163,39 @@ return [
                             'name' => 'setClientSecret', // name of the function/attribute to call
                             'call_parameters' => '__config_paymentpass__client_secret', // parameters to pass to the function, could be an array
                         ],
-                        'payment_info' => [ //for reference, not used
-                            'key_name' => 'payment_info', //name of the key to save the returned values, leave blank for not saving the returned value
-                            'type' => 'function', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
-                            'class' => '\MercadoPago\Payment', // class name of the instance
+                        'order_info_payment' => [ //for reference, not used
+                            'key_name' => 'merchant_order_info', //name of the key to save the returned values, leave blank for not saving the returned value
+                            'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
+                            'class' => '\MercadoPago\SDK', // class name of the instance
                             'name' => 'get', // name of the function/attribute to call
                             'create_parameters' => '', // parameters for the creation of the class, for 'function' types, could be an array, use __request__ for request data
-                            'call_parameters' => '__request__id', // parameters to pass to the function, could be an array, use __data__ for request data
+                            'call_parameters' => '/merchant_orders/__request__payment_info.order.id', // parameters to pass to the function, could be an array, use __request__ for request data
+                            'if'=>[ //conditional, only executes if is all the conditions are fullfilled
+                                ['value1'=>'__request__type', //first value to compare
+                                'condition'=>'=', // comparision, default =
+                                'value2'=>'payment'], // second value to compare
+                            ]
                         ],
                         'order_info' => [ //for reference, not used
                             'key_name' => 'merchant_order_info', //name of the key to save the returned values, leave blank for not saving the returned value
-                            'type' => 'function', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
-                            'class' => '\MercadoPago\MerchantOrder', // class name of the instance
+                            'type' => 'static', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters), 'attribute' (calls an attribute of the current 'sdk_call.class' object)
+                            'class' => '\MercadoPago\SDK', // class name of the instance
                             'name' => 'get', // name of the function/attribute to call
                             'create_parameters' => '', // parameters for the creation of the class, for 'function' types, could be an array, use __request__ for request data
-                            'call_parameters' => '__request__id', // parameters to pass to the function, could be an array, use __request__ for request data
+                            'call_parameters' => '/merchant_orders/__request__id', // parameters to pass to the function, could be an array, use __request__ for request data
+                            'if'=>[ //conditional, only executes if is all the conditions are fullfilled
+                                ['value1'=>'__request__topic', //first value to compare
+                                'condition'=>'=', // comparision, default =
+                                'value2'=>'merchant_order'], // second value to compare
+                            ]
                         ],
-                    ],
                     //now, the map to save the thata returned
-                    'referenceCode' => '__config_paymentpass__referenceCode.value', // the reference code of the transaction, internal
-                    'state' => 'nose',
-                    'payment_method' => 'nose',
-                    'reference' => '__request__id',
-                    'response' => '__request__merchant_order_info.response',
-                    'payment_state' => '__request__merchant_order_info.response.payments',
+                    'referenceCode' => '__request__merchant_order_info.external_reference', // the reference code of the transaction, internal
+                    'state' => '__request__payment_info.status',
+                    'payment_method' => '__request__payment_info.payment_type_id__ - __request__payment_info.payment_method_id',
+                    'reference' => '__request__data_id',
+                    'response' => '__request__merchant_order_info.preference_id',
+                    'payment_state' => '__request__payment_info.status_detail',
                     'save_data' => '__all__' // __all__ will save all the request data in the response_data field or specify an array of the request fields to use,
                 ],
                 'success' => [ // how to map the PaymentPass model with the post or get data for this specifc response call
@@ -169,7 +204,7 @@ return [
                     'referenceCode' => '__config_paymentpass__referenceCode.value', // the reference code of the transaction, internal
                     'state' => '4',
                     'payment_method' => 'payment_method_type',
-                    'reference' => '__config_paymentpass__referenceCode.value',
+                    'reference' => '_notthistime',
                     'response' => 'response_message_pol',
                     'payment_state' => 'response_code_pol',
                     'save_data' => '__all__' // __all__ will save all the request data in the response_data field or specify an array of the request fields to use,
