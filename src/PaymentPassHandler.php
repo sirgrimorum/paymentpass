@@ -259,12 +259,12 @@ class PaymentPassHandler {
     private function getResponseParameter($datos, $parameter) {
         if (stripos($parameter, "__request__") !== false) {
             $parameter = str_replace("__request__", "", $parameter);
-            $data = data_get($datos, $parameter, $parameter);
-            if (is_array($data) || is_object($data)) {
-                return json_encode($data);
-            } else {
-                return $data;
-            }
+        }
+        $data = data_get($datos, $parameter, $parameter);
+        if (is_array($data) || is_object($data)) {
+            return json_encode($data);
+        } else {
+            return $data;
         }
         return $parameter;
     }
