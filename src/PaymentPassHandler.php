@@ -106,21 +106,21 @@ class PaymentPassHandler {
         }
         $curConfig = $this->config;
         $curConfig = $this->translateConfig([], $curConfig, [], false);
-        if (!array_has($curConfig, "service.responses." . $responseType)) {
+        if (!\Illuminate\Support\Arr::has($curConfig, "service.responses." . $responseType)) {
             $responseType = "error";
         }
         if ($responseType == "error") {
-            $error = str_replace([":referenceCode", ":error"], [$request->get(array_get($curConfig, "service.$responseType.referenceCode")), $request->get("error", "Unknown error")], trans("paymentpass::messages.error"));
-            $callbackFunc = array_get($curConfig, "service.callbacks.failure", "");
+            $error = str_replace([":referenceCode", ":error"], [$request->get(\Illuminate\Support\Arr::get($curConfig, "service.$responseType.referenceCode")), $request->get("error", "Unknown error")], trans("paymentpass::messages.error"));
+            $callbackFunc = \Illuminate\Support\Arr::get($curConfig, "service.callbacks.failure", "");
             if (is_callable($callbackFunc)) {
                 call_user_func($callbackFunc, $error);
             }
             if ($request->isMethod('get')) {
-                Session::flash(array_get($curConfig, "error_messages_key"), $error);
+                Session::flash(\Illuminate\Support\Arr::get($curConfig, "error_messages_key"), $error);
             } else {
                 return $error;
             }
-            return response()->view(array_get($curConfig, "result_template", "paymentpass.result"), [
+            return response()->view(\Illuminate\Support\Arr::get($curConfig, "result_template", "paymentpass.result"), [
                         'user' => $request->user(),
                         'request' => $request,
                         'paymentPass' => $this->payment,
@@ -128,20 +128,20 @@ class PaymentPassHandler {
                             ], 200);
         } else {
             $datos = $request->all();
-            $configResponse = array_get($curConfig, "service.responses.$responseType");
-            foreach (array_get($configResponse, "_pre", []) as $reference => $class_datos) {
-                if ($this->conditionsFunction(array_get($class_datos, "if", []), $curConfig, $datos)) {
+            $configResponse = \Illuminate\Support\Arr::get($curConfig, "service.responses.$responseType");
+            foreach (\Illuminate\Support\Arr::get($configResponse, "_pre", []) as $reference => $class_datos) {
+                if ($this->conditionsFunction(\Illuminate\Support\Arr::get($class_datos, "if", []), $curConfig, $datos)) {
                     $typeClass = $class_datos['type'];
                     $className = $class_datos['class'];
                     $functionName = $class_datos['name'];
-                    $createParameters = array_get($class_datos, "create_parameters", "");
-                    $callParameters = array_get($class_datos, "call_parameters", "");
-                    if (array_get($class_datos, "key_name", "") != "") {
+                    $createParameters = \Illuminate\Support\Arr::get($class_datos, "create_parameters", "");
+                    $callParameters = \Illuminate\Support\Arr::get($class_datos, "call_parameters", "");
+                    if (\Illuminate\Support\Arr::get($class_datos, "key_name", "") != "") {
                         $auxDatos = $this->callSdkFunction($className, $functionName, $typeClass, $createParameters, $callParameters, $curConfig, $datos);
                         if (is_array($auxDatos) || is_object($auxDatos)) {
                             $auxDatos = json_decode(json_encode($auxDatos), true);
-                            if (array_has($auxDatos, "body")) {
-                                $auxDatos = array_get($auxDatos, "body");
+                            if (\Illuminate\Support\Arr::has($auxDatos, "body")) {
+                                $auxDatos = \Illuminate\Support\Arr::get($auxDatos, "body");
                             }
                         }
                         data_set($datos, $class_datos['key_name'], $auxDatos);
@@ -150,9 +150,9 @@ class PaymentPassHandler {
                     }
                 }
             }
-            $referenceCode = $this->getResponseParameter(array_get($configResponse, "referenceCode", ""), $curConfig, $datos);
+            $referenceCode = $this->getResponseParameter(\Illuminate\Support\Arr::get($configResponse, "referenceCode", ""), $curConfig, $datos);
             $payment = $this->getByReferencia($referenceCode);
-            if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
+            if (!\Illuminate\Support\Arr::get($curConfig, "production", false) && \Illuminate\Support\Arr::get($curConfig, "mostrarEchos", false)) {
                 if ($request->isMethod('get')) {
                     echo "<p>prueba</p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
                 }
@@ -162,7 +162,7 @@ class PaymentPassHandler {
             } else {
                 $noexiste = false;
             }
-            if ($payment || (!array_get($curConfig, "production", false))) {
+            if ($payment || (!\Illuminate\Support\Arr::get($curConfig, "production", false))) {
                 if ($noexiste) {
                     $this->payment = new PaymentPass();
                 } else {
@@ -170,45 +170,45 @@ class PaymentPassHandler {
                         $curConfig = $this->translateConfig(json_decode($this->payment->creation_data, true), $curConfig, [], false);
                     }
                 }
-                if (!array_get($curConfig, "production", false)) {
+                if (!\Illuminate\Support\Arr::get($curConfig, "production", false)) {
                     $datos['_responseType'] = $responseType;
                     $datos['_service'] = $this->service;
                 }
-                if (array_get($configResponse, "state", "") != "_notthistime") {
-                    $state = $this->getResponseParameter(array_get($configResponse, "state", ""), $curConfig, $datos);
+                if (\Illuminate\Support\Arr::get($configResponse, "state", "") != "_notthistime") {
+                    $state = $this->getResponseParameter(\Illuminate\Support\Arr::get($configResponse, "state", ""), $curConfig, $datos);
                     $stateAux = $state;
-                    if (array_has(array_get($curConfig, "service.state_codes.failure"), $stateAux)) {
-                        $stateAux = array_get($curConfig, "service.state_codes.failure." . $stateAux);
-                    } elseif (array_has(array_get($curConfig, "service.state_codes.pending"), $stateAux)) {
-                        $stateAux = array_get($curConfig, "service.state_codes.pending." . $stateAux);
-                    } elseif (array_has(array_get($curConfig, "service.state_codes.success"), $stateAux)) {
-                        $stateAux = array_get($curConfig, "service.state_codes.success." . $stateAux);
+                    if (\Illuminate\Support\Arr::has(\Illuminate\Support\Arr::get($curConfig, "service.state_codes.failure"), $stateAux)) {
+                        $stateAux = \Illuminate\Support\Arr::get($curConfig, "service.state_codes.failure." . $stateAux);
+                    } elseif (\Illuminate\Support\Arr::has(\Illuminate\Support\Arr::get($curConfig, "service.state_codes.pending"), $stateAux)) {
+                        $stateAux = \Illuminate\Support\Arr::get($curConfig, "service.state_codes.pending." . $stateAux);
+                    } elseif (\Illuminate\Support\Arr::has(\Illuminate\Support\Arr::get($curConfig, "service.state_codes.success"), $stateAux)) {
+                        $stateAux = \Illuminate\Support\Arr::get($curConfig, "service.state_codes.success." . $stateAux);
                     }
                     if (strlen($stateAux) > 3) {
                         $stateAux = substr($stateAux, 0, 3);
                     }
                     $this->payment->state = $stateAux;
                 }
-                if (array_get($configResponse, "payment_method", "_notthistime") != "_notthistime") {
-                    $this->payment->payment_method = $this->getResponseParameter(array_get($configResponse, "payment_method", ""), $curConfig, $datos);
+                if (\Illuminate\Support\Arr::get($configResponse, "payment_method", "_notthistime") != "_notthistime") {
+                    $this->payment->payment_method = $this->getResponseParameter(\Illuminate\Support\Arr::get($configResponse, "payment_method", ""), $curConfig, $datos);
                 }
-                if (array_get($configResponse, "reference", "_notthistime") != "_notthistime") {
-                    $this->payment->reference = $this->getResponseParameter(array_get($configResponse, "reference", ""), $curConfig, $datos);
+                if (\Illuminate\Support\Arr::get($configResponse, "reference", "_notthistime") != "_notthistime") {
+                    $this->payment->reference = $this->getResponseParameter(\Illuminate\Support\Arr::get($configResponse, "reference", ""), $curConfig, $datos);
                 }
-                if (array_get($configResponse, "response", "_notthistime") != "_notthistime") {
-                    $this->payment->response = $this->getResponseParameter(array_get($configResponse, "response", ""), $curConfig, $datos);
+                if (\Illuminate\Support\Arr::get($configResponse, "response", "_notthistime") != "_notthistime") {
+                    $this->payment->response = $this->getResponseParameter(\Illuminate\Support\Arr::get($configResponse, "response", ""), $curConfig, $datos);
                 }
-                if (array_get($configResponse, "payment_state", "_notthistime") != "_notthistime") {
-                    $this->payment->payment_state = $this->getResponseParameter(array_get($configResponse, "payment_state", ""), $curConfig, $datos);
+                if (\Illuminate\Support\Arr::get($configResponse, "payment_state", "_notthistime") != "_notthistime") {
+                    $this->payment->payment_state = $this->getResponseParameter(\Illuminate\Support\Arr::get($configResponse, "payment_state", ""), $curConfig, $datos);
                 }
-                if (array_get($configResponse, "save_data", "__all__") == "__all__" || !is_array(array_get($configResponse, "save_data"))) {
+                if (\Illuminate\Support\Arr::get($configResponse, "save_data", "__all__") == "__all__" || !is_array(\Illuminate\Support\Arr::get($configResponse, "save_data"))) {
                     $save_data = json_encode($datos);
                 } else {
-                    $save_data = json_encode(array_only($datos, array_get($configResponse, "save_data")));
+                    $save_data = json_encode(\Illuminate\Support\Arr::only($datos, \Illuminate\Support\Arr::get($configResponse, "save_data")));
                 }
                 if (!$request->isMethod('get')) {
                     $this->payment->response_date = now();
-                    if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
+                    if (\Illuminate\Support\Arr::get($configResponse, "save_data", "_notthistime") != "_notthistime") {
                         if ($this->payment->response_data != null){
                             $auxData = json_decode($this->payment->response_data, true);
                             if (is_array($auxData)){
@@ -219,7 +219,7 @@ class PaymentPassHandler {
                     }
                 } else {
                     $this->payment->confirmation_date = now();
-                    if (array_get($configResponse, "save_data", "_notthistime") != "_notthistime") {
+                    if (\Illuminate\Support\Arr::get($configResponse, "save_data", "_notthistime") != "_notthistime") {
                         if ($this->payment->confirmation_data != null){
                             $auxData = json_decode($this->payment->confirmation_data, true);
                             if (is_array($auxData)){
@@ -232,44 +232,44 @@ class PaymentPassHandler {
                 if (!$noexiste) {
                     $this->payment->save();
                 } else {
-                    if (array_get($curConfig, "saveAll", false)) {
+                    if (\Illuminate\Support\Arr::get($curConfig, "saveAll", false)) {
                         $this->payment->save();
                     }
                 }
-                if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
+                if (!\Illuminate\Support\Arr::get($curConfig, "production", false) && \Illuminate\Support\Arr::get($curConfig, "mostrarEchos", false)) {
                     if ($request->isMethod('get')) {
                         echo "<p></p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
                     }
                 }
 
-                if (in_array($state, array_get($curConfig, "service.state_codes.failure")) || array_has(array_get($curConfig, "service.state_codes.failure"), $state)) {
-                    $callbackFunc = array_get($curConfig, "service.callbacks.failure", "");
-                } elseif (in_array($state, array_get($curConfig, "service.state_codes.success")) || array_has(array_get($curConfig, "service.state_codes.success"), $state)) {
-                    $callbackFunc = array_get($curConfig, "service.callbacks.success", "");
+                if (in_array($state, \Illuminate\Support\Arr::get($curConfig, "service.state_codes.failure")) || \Illuminate\Support\Arr::has(\Illuminate\Support\Arr::get($curConfig, "service.state_codes.failure"), $state)) {
+                    $callbackFunc = \Illuminate\Support\Arr::get($curConfig, "service.callbacks.failure", "");
+                } elseif (in_array($state, \Illuminate\Support\Arr::get($curConfig, "service.state_codes.success")) || \Illuminate\Support\Arr::has(\Illuminate\Support\Arr::get($curConfig, "service.state_codes.success"), $state)) {
+                    $callbackFunc = \Illuminate\Support\Arr::get($curConfig, "service.callbacks.success", "");
                 } else {
-                    $callbackFunc = array_get($curConfig, "service.callbacks.other", "");
+                    $callbackFunc = \Illuminate\Support\Arr::get($curConfig, "service.callbacks.other", "");
                 }
                 if (is_callable($callbackFunc)) {
                     call_user_func($callbackFunc, $this->payment);
                 }
                 if ($request->isMethod('get')) {
-                    if (in_array($this->payment->state, array_get($curConfig, "service.state_codes.failure"))) {
-                        Session::flash(array_get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$this->payment->referenceCode], trans("paymentpass::services.{$this->service}.messages.{$this->payment->state}")));
+                    if (in_array($this->payment->state, \Illuminate\Support\Arr::get($curConfig, "service.state_codes.failure"))) {
+                        Session::flash(\Illuminate\Support\Arr::get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$this->payment->referenceCode], trans("paymentpass::services.{$this->service}.messages.{$this->payment->state}")));
                     } else {
-                        Session::flash(array_get($curConfig, "status_messages_key"), str_replace([":referenceCode"], [$this->payment->referenceCode], trans("paymentpass::services.{$this->service}.messages.{$this->payment->state}")));
+                        Session::flash(\Illuminate\Support\Arr::get($curConfig, "status_messages_key"), str_replace([":referenceCode"], [$this->payment->referenceCode], trans("paymentpass::services.{$this->service}.messages.{$this->payment->state}")));
                     }
                 } else {
                     return response()->json($this->payment->payment_state, 201);
                 }
             } else {
                 if ($request->isMethod('get')) {
-                    Session::flash(array_get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$request->get(array_get($curConfig, "service.$responseType.referenceCode"))], trans("paymentpass::messages.not_found")));
+                    Session::flash(\Illuminate\Support\Arr::get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$request->get(\Illuminate\Support\Arr::get($curConfig, "service.$responseType.referenceCode"))], trans("paymentpass::messages.not_found")));
                 } else {
                     return response()->json('not_found', 200);
                 }
             }
             if ($request->isMethod('get')) {
-                return response()->view(array_get($curConfig, "result_template", "paymentpass.result"), [
+                return response()->view(\Illuminate\Support\Arr::get($curConfig, "result_template", "paymentpass.result"), [
                             'user' => $request->user(),
                             'request' => $request,
                             'paymentPass' => $this->payment,
@@ -291,11 +291,11 @@ class PaymentPassHandler {
     private function conditionsFunction($ifs, $config, $datos) {
         if (is_array($ifs)) {
             foreach ($ifs as $if) {
-                $value1 = array_get($if, "value1", "");
+                $value1 = \Illuminate\Support\Arr::get($if, "value1", "");
                 $value1 = $this->translate_parameters($value1, $config, $datos);
-                $value2 = array_get($if, "value2", "");
+                $value2 = \Illuminate\Support\Arr::get($if, "value2", "");
                 $value2 = $this->translate_parameters($value2, $config, $datos);
-                $condition = array_get("if", "condition", "=");
+                $condition = \Illuminate\Support\Arr::get("if", "condition", "=");
                 switch ($condition) {
                     case "=":
                         if ($value1 != $value2) {
@@ -363,14 +363,14 @@ class PaymentPassHandler {
         $curConfig = $this->config;
         $curConfig['service']['referenceCode']['value'] = $this->generateResponseCode($data);
         $curConfig = $this->translateConfig($data, $curConfig, $curConfig);
-        if (array_get($curConfig, "service.signature.active", false)) {
+        if (\Illuminate\Support\Arr::get($curConfig, "service.signature.active", false)) {
             $strHash = "";
             $preHash = "";
-            foreach (array_get($curConfig, "service.signature.fields", "~") as $parameter) {
+            foreach (\Illuminate\Support\Arr::get($curConfig, "service.signature.fields", "~") as $parameter) {
                 $strHash .= $preHash . $parameter;
-                $preHash = array_get($curConfig, "service.signature.separator", "~");
+                $preHash = \Illuminate\Support\Arr::get($curConfig, "service.signature.separator", "~");
             }
-            switch (array_get($curConfig, "service.signature.encryption", "md5")) {
+            switch (\Illuminate\Support\Arr::get($curConfig, "service.signature.encryption", "md5")) {
                 case "sha256":
                     $curConfig['service']['signature']['value'] = Hash::make($strHash);
                     break;
@@ -384,56 +384,56 @@ class PaymentPassHandler {
             }
         }
         $curConfig = $this->translateConfig($data, $curConfig);
-        foreach (array_get($curConfig, "service.responses", []) as $responseName => $responseData) {
-            $responseUrl = array_get($responseData, "url", "");
+        foreach (\Illuminate\Support\Arr::get($curConfig, "service.responses", []) as $responseName => $responseData) {
+            $responseUrl = \Illuminate\Support\Arr::get($responseData, "url", "");
             if ($responseUrl == "") {
                 $curConfig['service']['responses'][$responseName]['url'] = route("paymentpass::response", ["service" => $this->service, "responseType" => $responseName]);
             }
         }
         if ($curConfig['service']['type'] == "sdk") {
             $redirectUrl = route("paymentpass::response", ['service' => $this->service, 'responseType' => "error"]);
-            foreach (array_get($curConfig, "service.responses", []) as $responseName => $responseData) {
-                $responseUrl = array_get($responseData, "url", "");
+            foreach (\Illuminate\Support\Arr::get($curConfig, "service.responses", []) as $responseName => $responseData) {
+                $responseUrl = \Illuminate\Support\Arr::get($responseData, "url", "");
                 if ($responseUrl != "") {
-                    data_set($curConfig, 'service.parameters.' . array_get($curConfig, "service.responses." . $responseName . ".url_field_name"), array_get($curConfig, "service.responses." . $responseName . ".url", ""));
+                    data_set($curConfig, 'service.parameters.' . \Illuminate\Support\Arr::get($curConfig, "service.responses." . $responseName . ".url_field_name"), \Illuminate\Support\Arr::get($curConfig, "service.responses." . $responseName . ".url", ""));
                 }
             }
-            if (array_get($curConfig, "service.referenceCode.send", false)) {
-                data_set($curConfig, 'service.parameters.' . array_get($curConfig, "service.referenceCode.field_name"), array_get($curConfig, "service.referenceCode.value", ""));
+            if (\Illuminate\Support\Arr::get($curConfig, "service.referenceCode.send", false)) {
+                data_set($curConfig, 'service.parameters.' . \Illuminate\Support\Arr::get($curConfig, "service.referenceCode.field_name"), \Illuminate\Support\Arr::get($curConfig, "service.referenceCode.value", ""));
             }
-            if (array_get($curConfig, "service.signature.send", false)) {
-                data_set($curConfig, 'service.parameters.' . array_get($curConfig, "service.signature.field_name"), array_get($curConfig, "service.signature.value", ""));
+            if (\Illuminate\Support\Arr::get($curConfig, "service.signature.send", false)) {
+                data_set($curConfig, 'service.parameters.' . \Illuminate\Support\Arr::get($curConfig, "service.signature.field_name"), \Illuminate\Support\Arr::get($curConfig, "service.signature.value", ""));
             }
-            if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
+            if (!\Illuminate\Support\Arr::get($curConfig, "production", false) && \Illuminate\Support\Arr::get($curConfig, "mostrarEchos", false)) {
                 echo "<p>Lats_configuration pre_sdk</p><pre>" . print_r($curConfig, true) . "</pre>";
             }
-            if (array_has($curConfig['service'], "pre_sdk")) {
-                foreach (array_get($curConfig, "service.pre_sdk", []) as $refName => $class_datos) {
+            if (\Illuminate\Support\Arr::has($curConfig['service'], "pre_sdk")) {
+                foreach (\Illuminate\Support\Arr::get($curConfig, "service.pre_sdk", []) as $refName => $class_datos) {
                     $this->callSdkFunction(
-                            $class_datos['class'], $class_datos['name'], $class_datos['type'], array_get($class_datos, 'create_parameters', ""), array_get($class_datos, 'call_parameters', ""), $curConfig, $data
+                            $class_datos['class'], $class_datos['name'], $class_datos['type'], \Illuminate\Support\Arr::get($class_datos, 'create_parameters', ""), \Illuminate\Support\Arr::get($class_datos, 'call_parameters', ""), $curConfig, $data
                     );
                 }
             }
-            if (array_has($curConfig, "service.sdk_call")) {
+            if (\Illuminate\Support\Arr::has($curConfig, "service.sdk_call")) {
                 $class_datos = $curConfig['service']['sdk_call'];
                 $className = $class_datos['class'];
                 $typeCall = $class_datos['type'];
-                $createParameters = array_get($class_datos, 'create_parameters', "");
+                $createParameters = \Illuminate\Support\Arr::get($class_datos, 'create_parameters', "");
                 $objeto = $this->getInstanceSdk($className, $typeCall, $createParameters, $curConfig, $data);
-                if (array_has($class_datos, "pre_functions")) {
-                    foreach (array_get($class_datos, "pre_functions", []) as $functionName => $callParameters) {
+                if (\Illuminate\Support\Arr::has($class_datos, "pre_functions")) {
+                    foreach (\Illuminate\Support\Arr::get($class_datos, "pre_functions", []) as $functionName => $callParameters) {
                         $this->callInstanceSdk($objeto, "function", $functionName, $callParameters, $curConfig, $data);
                     }
                 }
-                if (array_has($curConfig, "service.sdk_call.name")) {
+                if (\Illuminate\Support\Arr::has($curConfig, "service.sdk_call.name")) {
                     $functionName = $class_datos['name'];
-                    $callParameters = array_get($class_datos, 'call_parameters', "");
+                    $callParameters = \Illuminate\Support\Arr::get($class_datos, 'call_parameters', "");
                     $redirectUrl = $this->callInstanceSdk($objeto, $typeCall, $functionName, $callParameters, $curConfig, $data);
                 }
             }
             $curConfig['service']['action'] = $redirectUrl;
         }
-        if (!array_get($curConfig, "production", false) && array_get($curConfig, "mostrarEchos", false)) {
+        if (!\Illuminate\Support\Arr::get($curConfig, "production", false) && \Illuminate\Support\Arr::get($curConfig, "mostrarEchos", false)) {
             if (!request()->wantsJson()) {
                 echo "<p>Last_configuration</p><pre>" . print_r($curConfig, true) . "</pre>";
             }
@@ -460,21 +460,21 @@ class PaymentPassHandler {
      */
     private function getJsonView($config, $datos) {
         $return = [
-            "action" => array_get($config, "service.action"),
-            "method" => array_get($config, "service.method"),
+            "action" => \Illuminate\Support\Arr::get($config, "service.action"),
+            "method" => \Illuminate\Support\Arr::get($config, "service.method"),
         ];
         $return["parameters"] = [];
-        if (array_get($config, "service.method") != "url") {
-            if (array_get($config, "service.referenceCode.send", false)) {
-                $return["parameters"][array_get($config, "service.referenceCode.field_name")] = array_get($config, "service.referenceCode.value");
+        if (\Illuminate\Support\Arr::get($config, "service.method") != "url") {
+            if (\Illuminate\Support\Arr::get($config, "service.referenceCode.send", false)) {
+                $return["parameters"][\Illuminate\Support\Arr::get($config, "service.referenceCode.field_name")] = \Illuminate\Support\Arr::get($config, "service.referenceCode.value");
             }
-            if (array_get($config, "service.signature.send", false)) {
-                $return["parameters"][array_get($config, "service.signature.field_name")] = array_get($config, "service.signature.value");
+            if (\Illuminate\Support\Arr::get($config, "service.signature.send", false)) {
+                $return["parameters"][\Illuminate\Support\Arr::get($config, "service.signature.field_name")] = \Illuminate\Support\Arr::get($config, "service.signature.value");
             }
-            foreach (array_get($config, "service.responses", []) as $response_name => $response_datos) {
-                $return["parameters"][array_get($response_datos, "url_field_name", "")] = array_get($response_datos, "url", "");
+            foreach (\Illuminate\Support\Arr::get($config, "service.responses", []) as $response_name => $response_datos) {
+                $return["parameters"][\Illuminate\Support\Arr::get($response_datos, "url_field_name", "")] = \Illuminate\Support\Arr::get($response_datos, "url", "");
             }
-            foreach (array_get($config, "service.parameters", []) as $parameter => $value) {
+            foreach (\Illuminate\Support\Arr::get($config, "service.parameters", []) as $parameter => $value) {
                 if (is_array($value)) {
                     $return["parameters"][$parameter] = json_encode($value);
                 } else {
@@ -482,8 +482,8 @@ class PaymentPassHandler {
                 }
             }
         } else {
-            $parts = parse_url(array_get($config, "service.action"));
-            if (array_has($parts, "query")) {
+            $parts = parse_url(\Illuminate\Support\Arr::get($config, "service.action"));
+            if (\Illuminate\Support\Arr::has($parts, "query")) {
                 parse_str($parts['query'], $query);
                 if (is_array($query)) {
                     foreach ($query as $parameter => $value) {
@@ -573,7 +573,7 @@ class PaymentPassHandler {
                 return $service['parameters'];
             } elseif (stripos($param_config_array, '__service_parameters__') !== false) {
                 $aux = str_replace('__service_parameters__', '', $param_config_array);
-                return array_get($service['parameters'], $aux, $aux);
+                return \Illuminate\Support\Arr::get($service['parameters'], $aux, $aux);
             } else {
                 $item = $this->translateString($param_config_array, "__route__", "route");
                 $item = $this->translateString($item, "__url__", "url");
@@ -646,14 +646,14 @@ class PaymentPassHandler {
         } else {
             $referenceCode = "";
         }
-        if (array_get($curConfig, "service.referenceCode.type", "auto") == "auto") {
+        if (\Illuminate\Support\Arr::get($curConfig, "service.referenceCode.type", "auto") == "auto") {
             $strHash = $referenceCode;
             $preHash = "";
-            foreach (array_get($curConfig, "service.referenceCode.fields", []) as $parameter) {
+            foreach (\Illuminate\Support\Arr::get($curConfig, "service.referenceCode.fields", []) as $parameter) {
                 $strHash .= $preHash . $parameter;
-                $preHash = array_get($curConfig, "service.referenceCode.separator", "~");
+                $preHash = \Illuminate\Support\Arr::get($curConfig, "service.referenceCode.separator", "~");
             }
-            switch (array_get($curConfig, "service.referenceCode.encryption", "md5")) {
+            switch (\Illuminate\Support\Arr::get($curConfig, "service.referenceCode.encryption", "md5")) {
                 case "sha256":
                     $referenceCode = Hash::make($strHash);
                     break;
@@ -666,7 +666,7 @@ class PaymentPassHandler {
                     break;
             }
         } else {
-            $referenceCode = array_get($curConfig, "service.referenceCode.type");
+            $referenceCode = \Illuminate\Support\Arr::get($curConfig, "service.referenceCode.type");
         }
         return $referenceCode;
     }
@@ -676,14 +676,14 @@ class PaymentPassHandler {
      */
     private function buildConfig() {
         $auxConfig = config("sirgrimorum.paymentpass");
-        $config = array_except($auxConfig, ['services_production', 'services_test']);
-        $serviceProd = array_get($auxConfig, 'services_production.' . $this->service, []);
-        if (!array_get($auxConfig, 'production', false)) {
-            $serviceTest = array_get($auxConfig, 'services_test.' . $this->service, []);
+        $config = \Illuminate\Support\Arr::except($auxConfig, ['services_production', 'services_test']);
+        $serviceProd = \Illuminate\Support\Arr::get($auxConfig, 'services_production.' . $this->service, []);
+        if (!\Illuminate\Support\Arr::get($auxConfig, 'production', false)) {
+            $serviceTest = \Illuminate\Support\Arr::get($auxConfig, 'services_test.' . $this->service, []);
             $serviceProd = $this->smartMergeConfig($serviceProd, $serviceTest);
         }
         $config['service'] = $serviceProd;
-        if (!array_has($config['service'], "type")) {
+        if (!\Illuminate\Support\Arr::has($config['service'], "type")) {
             $config['service']['type'] = "normal";
         }
         return $config;
@@ -711,7 +711,7 @@ class PaymentPassHandler {
         if (is_array($preConfig)) {
             if (is_array($config)) {
                 foreach ($preConfig as $key => $value) {
-                    if (!array_has($config, $key)) {
+                    if (!\Illuminate\Support\Arr::has($config, $key)) {
                         if (is_array($value)) {
                             if ($auxValue = $this->smartMergeConfig("", $value)) {
                                 $config[$key] = $auxValue;
@@ -841,7 +841,7 @@ class PaymentPassHandler {
      */
     private function translateString($item, $prefix, $function, $data = [], $config = [], $close = "__") {
         $result = "";
-        if (str_contains($item, $prefix)) {
+        if (\Illuminate\Support\Str::contains($item, $prefix)) {
             if (($left = (stripos($item, $prefix))) !== false) {
                 while ($left !== false) {
                     if (($right = stripos($item, $close, $left + strlen($prefix))) === false) {
@@ -849,7 +849,7 @@ class PaymentPassHandler {
                     }
                     $textPiece = substr($item, $left + strlen($prefix), $right - ($left + strlen($prefix)));
                     $piece = $textPiece;
-                    if (str_contains($textPiece, "{")) {
+                    if (\Illuminate\Support\Str::contains($textPiece, "{")) {
                         $auxLeft = (stripos($textPiece, "{"));
                         $auxRight = stripos($textPiece, "}", $left) + 1;
                         $auxJson = substr($textPiece, $auxLeft, $auxRight - $auxLeft);
@@ -971,8 +971,8 @@ class PaymentPassHandler {
     private function getValor($dato, $data) {
         if (!is_array($data)) {
             return $dato;
-        } elseif (array_has($data, $dato)) {
-            return array_get($data, $dato, $dato);
+        } elseif (\Illuminate\Support\Arr::has($data, $dato)) {
+            return \Illuminate\Support\Arr::get($data, $dato, $dato);
         } else {
             foreach ($data as $key => $item) {
                 if (is_array($item)) {
