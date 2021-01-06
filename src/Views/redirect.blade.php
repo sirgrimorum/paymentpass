@@ -49,13 +49,15 @@
 </div>
 {!! \Illuminate\Support\Arr::get($config,"redirect_post_html") !!}
 @stop
-@if (\Illuminate\Support\Arr::get($config, "production", true))
 @push(\Illuminate\Support\Arr::get($config,"js_section"))
+@if (\Illuminate\Support\Arr::get($config, "production", true))
 <script>
-            window.onload = function () {
-                document.forms['paymentPassForm'].submit();
-            }
-    ;
+    window.onload = function () {
+        document.forms['paymentPassForm'].submit();
+    };
 </script>
-@endpush
 @endif
+@if (\Illuminate\Support\Arr::get($actionConfig, "con_script", false)!== false && \Illuminate\Support\Arr::get($actionConfig, "con_script", false)!= "")
+{!! $actionConfig['con_script']  !!}
+@endpush
+

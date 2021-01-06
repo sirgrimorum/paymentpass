@@ -685,6 +685,10 @@ class PaymentPassHandler
                 $item = $this->translateString($item, "__request__", "data", $data);
                 $item = $this->translateString($item, "__trans__", "trans");
                 $item = $this->translateString($item, "__asset__", "asset");
+                $item = $this->translateString($item, "__session_id__", "session_id");
+                $item = $this->translateString($item, "__device_session_id__", "device_session_id");
+                $item = $this->translateString($item, "__ip_address__", "ip_address");
+                $item = $this->translateString($item, "__user_agent__", "user_agent");
                 $item = $this->translateString($item, "__config_paymentpass__", "config_paymentpass", $data, $config);
                 return $item;
             }
@@ -920,7 +924,12 @@ class PaymentPassHandler
                     }
                     $item = $this->translateString($item, "__trans__", "trans");
                     $item = $this->translateString($item, "__asset__", "asset");
+                    $item = $this->translateString($item, "__session_id__", "session_id");
+                    $item = $this->translateString($item, "__device_session_id__", "device_session_id");
+                    $item = $this->translateString($item, "__ip_address__", "ip_address");
+                    $item = $this->translateString($item, "__user_agent__", "user_agent");
                     $item = $this->translateString($item, "__config_paymentpass__", "config_paymentpass", $configComplete, $result);
+                    $item = $this->translateString($item, "__auto__", "auto", $data, $result);
                     $item = $this->translateString($item, "__auto__", "auto", $data, $result);
                     $result[$key] = $item;
                 } else {
@@ -951,111 +960,122 @@ class PaymentPassHandler
      */
     private function translateString($item, $prefix, $function, $data = [], $config = [], $close = "__")
     {
-        $result = "";
-        if (Str::contains($item, $prefix)) {
-            if (($left = (stripos($item, $prefix))) !== false) {
-                while ($left !== false) {
-                    if (($right = stripos($item, $close, $left + strlen($prefix))) === false) {
-                        $right = strlen($item);
-                    }
-                    $textPiece = substr($item, $left + strlen($prefix), $right - ($left + strlen($prefix)));
-                    $piece = $textPiece;
-                    if (Str::contains($textPiece, "{")) {
-                        $auxLeft = (stripos($textPiece, "{"));
-                        $auxRight = stripos($textPiece, "}", $left) + 1;
-                        $auxJson = substr($textPiece, $auxLeft, $auxRight - $auxLeft);
-                        $textPiece = str_replace($auxJson, "*****", $textPiece);
-                        $auxJson = str_replace(["'", ", }"], ['"', "}"], $auxJson);
-                        $auxArr = explode(",", str_replace([" ,", " ,"], [",", ","], $textPiece));
-                        if ($auxIndex = array_search("*****", $auxArr)) {
-                            $auxArr[$auxIndex] = json_decode($auxJson, true);
-                        } else {
-                            $auxArr[] = json_decode($auxJson);
+        if (isset($item)) {
+            $result = "";
+            if (Str::contains($item, $prefix)) {
+                if (($left = (stripos($item, $prefix))) !== false) {
+                    while ($left !== false) {
+                        if (($right = stripos($item, $close, $left + strlen($prefix))) === false) {
+                            $right = strlen($item);
                         }
-                        $piece = call_user_func_array($function, $auxArr);
-                    } else {
-                        if ($function == 'config_paymentpass') {
-                            $piece = $this->getValorDesde($textPiece, $data, $config);
-                        } elseif ($function == 'data') {
-                            $piece = $this->getValor($textPiece, $data);
-                        } elseif ($function == 'auto') {
-                            $datos = explode("|", $textPiece);
-                            if (count($datos) > 2) {
-                                $datosParameters = explode(",", $datos[1]);
-                                $datosFields = explode(",", $datos[2]);
-                            } elseif (count($datos) > 1) {
-                                $datosParameters = explode(",", $datos[1]);
-                                $datosFields = [];
+                        $textPiece = substr($item, $left + strlen($prefix), $right - ($left + strlen($prefix)));
+                        $piece = $textPiece;
+                        if (Str::contains($textPiece, "{")) {
+                            $auxLeft = (stripos($textPiece, "{"));
+                            $auxRight = stripos($textPiece, "}", $left) + 1;
+                            $auxJson = substr($textPiece, $auxLeft, $auxRight - $auxLeft);
+                            $textPiece = str_replace($auxJson, "*****", $textPiece);
+                            $auxJson = str_replace(["'", ", }"], ['"', "}"], $auxJson);
+                            $auxArr = explode(",", str_replace([" ,", ", "], [",", ","], $textPiece));
+                            if ($auxIndex = array_search("*****", $auxArr)) {
+                                $auxArr[$auxIndex] = json_decode($auxJson, true);
                             } else {
-                                $datosParameters = [];
-                                $datosFields = [];
+                                $auxArr[] = json_decode($auxJson, true);
                             }
-                            switch ($datos[0]) {
-                                case "taxReturnBase":
-                                    if (count($datosParameters) == 3) {
-                                        $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
-                                        $valor = (float) $this->getValorDesde($datosParameters[1], $data, $config);
-                                        try {
-                                            $piece = number_format(($valor / (1 + $impuesto)), $datosParameters[2], ".", "");
-                                        } catch (Exception $exc) {
+                            $piece = call_user_func_array($function, $auxArr);
+                        } else {
+                            if ($function == 'config_paymentpass') {
+                                $piece = $this->getValorDesde($textPiece, $data, $config);
+                            } elseif ($function == 'ip_address') {
+                                $piece = $_SERVER['REMOTE_ADDR'];
+                            } elseif ($function == 'user_agent') {
+                                $piece = $_SERVER['HTTP_USER_AGENT'];
+                            } elseif ($function == 'session_id') {
+                                $piece = session_id();
+                            } elseif ($function == 'device_session_id') {
+                                $piece = md5(session_id() . microtime());
+                            } elseif ($function == 'data') {
+                                $piece = $this->getValor($textPiece, $data);
+                            } elseif ($function == 'auto') {
+                                $datos = explode("|", $textPiece);
+                                if (count($datos) > 2) {
+                                    $datosParameters = explode(",", $datos[1]);
+                                    $datosFields = explode(",", $datos[2]);
+                                } elseif (count($datos) > 1) {
+                                    $datosParameters = explode(",", $datos[1]);
+                                    $datosFields = [];
+                                } else {
+                                    $datosParameters = [];
+                                    $datosFields = [];
+                                }
+                                switch ($datos[0]) {
+                                    case "taxReturnBase":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
+                                            $valor = (float) $this->getValorDesde($datosParameters[1], $data, $config);
+                                            try {
+                                                $piece = number_format(($valor / (1 + $impuesto)), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) {
+                                                $piece = "";
+                                            }
+                                        } else {
                                             $piece = "";
                                         }
-                                    } else {
-                                        $piece = "";
-                                    }
-                                    break;
-                                case "tax":
-                                    if (count($datosParameters) == 3) {
-                                        $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
-                                        $base = (float) $this->getValorDesde($datosParameters[1], $data, $config);
-                                        try {
-                                            $piece = number_format(($base * $impuesto), $datosParameters[2], ".", "");
-                                        } catch (Exception $exc) {
+                                        break;
+                                    case "tax":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
+                                            $base = (float) $this->getValorDesde($datosParameters[1], $data, $config);
+                                            try {
+                                                $piece = number_format(($base * $impuesto), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) {
+                                                $piece = "";
+                                            }
+                                        } else {
                                             $piece = "";
                                         }
-                                    } else {
-                                        $piece = "";
-                                    }
-                                    break;
-                                case "valueToPay":
-                                    if (count($datosParameters) == 3) {
-                                        $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
-                                        $base = (float) $this->getValorDesde($datosParameters[1], $data, $config);
-                                        try {
-                                            $piece = number_format($base * (1 + $impuesto), $datosParameters[2], ".", "");
-                                        } catch (Exception $exc) {
+                                        break;
+                                    case "valueToPay":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
+                                            $base = (float) $this->getValorDesde($datosParameters[1], $data, $config);
+                                            try {
+                                                $piece = number_format($base * (1 + $impuesto), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) {
+                                                $piece = "";
+                                            }
+                                        } else {
                                             $piece = "";
                                         }
-                                    } else {
-                                        $piece = "";
-                                    }
-                                    break;
-                                default:
-                                    $piece = $textPiece;
-                                    break;
+                                        break;
+                                    default:
+                                        $piece = $textPiece;
+                                        break;
+                                }
+                            } else {
+                                $piece = call_user_func($function, $textPiece);
                             }
-                        } else {
-                            $piece = call_user_func($function, $textPiece);
                         }
-                    }
-                    if (is_string($piece)) {
-                        if ($right <= strlen($item)) {
-                            $item = substr($item, 0, $left) . $piece . substr($item, $right + 2);
+                        if (is_string($piece)) {
+                            if ($right <= strlen($item)) {
+                                $item = substr($item, 0, $left) . $piece . substr($item, $right + 2);
+                            } else {
+                                $item = substr($item, 0, $left) . $piece;
+                            }
+                            $left = (stripos($item, $prefix));
                         } else {
-                            $item = substr($item, 0, $left) . $piece;
+                            $item = $piece;
+                            $left = false;
                         }
-                        $left = (stripos($item, $prefix));
-                    } else {
-                        $item = $piece;
-                        $left = false;
                     }
                 }
+                $result = $item;
+            } else {
+                $result = $item;
             }
-            $result = $item;
-        } else {
-            $result = $item;
+            return $result;
         }
-        return $result;
+        return $item;
     }
 
     /**
