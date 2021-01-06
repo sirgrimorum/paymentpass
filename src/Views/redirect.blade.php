@@ -18,18 +18,9 @@
         </div>
     </div>
     @endif
-    <form method="{{\Illuminate\Support\Arr::get($config,"service.method")}}" action="{{\Illuminate\Support\Arr::get($config,"service.action")}}" id="paymentPassForm" name="paymentPassForm">
-        @if(\Illuminate\Support\Arr::get($config,"service.method") != "url")
-        @if (\Illuminate\Support\Arr::get($config,"service.referenceCode.send",false))
-        <input name="{{\Illuminate\Support\Arr::get($config,"service.referenceCode.field_name")}}" type="hidden"  value="{{\Illuminate\Support\Arr::get($config,"service.referenceCode.value")}}" >
-        @endif
-        @if (\Illuminate\Support\Arr::get($config,"service.signature.send",false))
-        <input name="{{\Illuminate\Support\Arr::get($config,"service.signature.field_name")}}" type="hidden"  value="{{\Illuminate\Support\Arr::get($config,"service.signature.value")}}" >
-        @endif
-        @foreach(\Illuminate\Support\Arr::get($config,"service.responses",[]) as $response_name=>$response_datos)
-            <input name="{{\Illuminate\Support\Arr::get($response_datos,"url_field_name","")}}" type="hidden"  value="{{\Illuminate\Support\Arr::get($response_datos,"url","")}}" >
-        @endforeach
-        @foreach(\Illuminate\Support\Arr::get($config,"service.parameters",[]) as $parameter=>$value)
+    <form method="{{\Illuminate\Support\Arr::get($actionConfig,"method")}}" action="{{\Illuminate\Support\Arr::get($actionConfig,"action")}}" id="paymentPassForm" name="paymentPassForm">
+        @if(\Illuminate\Support\Arr::get($actionConfig,"method") != "url")
+        @foreach(\Illuminate\Support\Arr::get($actionConfig,"call_parameters",[]) as $parameter=>$value)
         @if (is_array($value))
         <input name="{{$parameter}}" type="hidden"  value="{{json_encode($value)}}"/>
         @else
@@ -38,7 +29,7 @@
         @endforeach
         @else
         <?php
-        $parts = parse_url(\Illuminate\Support\Arr::get($config,"service.action"));
+        $parts = parse_url(\Illuminate\Support\Arr::get($actionConfig,"action"));
         if (\Illuminate\Support\Arr::has($parts,"query")){
         parse_str($parts['query'], $query);
         ?>

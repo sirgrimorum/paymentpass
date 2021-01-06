@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Migrations\Migration;
 
@@ -11,7 +12,7 @@ class CreateSirgrimorumPaymentpassPaymentPasses extends Migration {
      * @return void
      */
     public function up() {
-        Schema::create('payment_passes', function($table) {
+        Schema::create('payment_passes', function(Blueprint $table) {
             $table->engine = 'InnoDB';
             $table->bigIncrements('id');
             $table->string('referenceCode', 255)->nullable();

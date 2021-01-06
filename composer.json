@@ -8,20 +8,19 @@
     ],
     "homepage": "https://github.com/sirgrimorum/paymentpass",
     "license": "MIT",
-    "authors": [
-        {
-            "name": "SirGrimorum",
-            "email": "andres.espinosa@grimorum.com",
-            "homepage": "https://github.com/sirgrimorum",
-            "role": "Developer"
-        }
-    ],
+    "authors": [{
+        "name": "SirGrimorum",
+        "email": "andres.espinosa@grimorum.com",
+        "homepage": "https://github.com/sirgrimorum",
+        "role": "Developer"
+    }],
     "require": {
-        "php": ">=7.0",
-        "laravel/framework": ">=5.6"
+        "php": ">=7.2",
+        "laravel/framework": ">=7.0",
+        "guzzlehttp/guzzle": "^7.0"
     },
     "require-dev": {
-        "phpunit/phpunit" : ">=5.4.3",
+        "phpunit/phpunit": ">=5.4.3",
         "squizlabs/php_codesniffer": "^2.3"
     },
     "autoload": {
@@ -33,11 +32,11 @@
         }
     },
     "autoload-dev": {
-        
+
     },
     "extra": {
         "branch-alias": {
-            "dev-master": "1.2.3-dev"
+            "dev-master": "1.2.4-dev"
         },
         "laravel": {
             "providers": [
