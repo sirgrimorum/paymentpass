@@ -449,8 +449,8 @@ class PaymentPassHandler
                             $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], Arr::get($actionConfig, 'call_parameters', []));
                             if ($response->successful()) {
                                 if ($con_mapearRespuesta) {
-                                    $datosDevolver = [];
-                                    $this->mapearRespuesta($curConfig, $datosDevolver, $response->json(), $data, $actionConfig, "");
+                                        $datosDevolver = [];
+                                        $this->mapearRespuesta($curConfig, $datosDevolver, $response->json(), $data, $actionConfig, "");
                                 } else {
                                     $datosDevolver = $response->json();
                                 }
@@ -535,7 +535,7 @@ class PaymentPassHandler
             $curActionConfig == $actionConfig;
         }
         $reRevisar = false;
-        if (($field_name = Arr::get($curActionConfig, "field_name", false)) && $result !== null) {
+        if (($field_name = Arr::get($curActionConfig, "field_name", false))) {
             if (is_string($field_name)) {
                 data_set($actionConfig, $preFieldsName . $field_name, $result);
                 $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
@@ -549,10 +549,10 @@ class PaymentPassHandler
                         data_set($actionConfig, $preFieldsName . $keyField, $valueField == 'true');
                         $reRevisar = true;
                     } elseif (is_string($keyField) && is_string($valueField) && $valueField !== null) {
-                        if (is_array($result)) {
+                        if (is_array($result) && $result !== null) {
                             data_set($actionConfig, $preFieldsName . $keyField, Arr::get($result, $valueField, $valueField));
                             $reRevisar = true;
-                        } elseif (is_object($result)) {
+                        } elseif (is_object($result) && $result !== null) {
                             if (property_exists($result, $valueField)) {
                                 if (is_callable([$result, $valueField])) {
                                     data_set($actionConfig, $preFieldsName . $keyField, $result->{$valueField}());
