@@ -3,6 +3,7 @@
 namespace Sirgrimorum\PaymentPass;
 
 use Exception;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
@@ -117,7 +118,7 @@ class PaymentPassHandler
             $responseType = strtolower($responseType);
         }
         $curConfig = $this->config;
-        $curConfig = $this->translateConfig([], $curConfig, [], false);
+        $curConfig = (new PaymentPassTranslator([], $curConfig, $this->config, false))->translate();
         if (!Arr::has($curConfig, "service.responses." . $responseType)) {
             $responseType = "error";
         }
@@ -159,11 +160,9 @@ class PaymentPassHandler
             }
             $referenceCode = $this->getResponseParameter(Arr::get($configResponse, "referenceCode", ""), $curConfig, $datos);
             $payment = $this->getByReferencia($referenceCode);
-            if (!Arr::get($curConfig, "production", false) && Arr::get($curConfig, "mostrarEchos", false)) {
-                if ($request->isMethod('get')) {
-                    echo "<p>prueba</p><pre>" . print_r(["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment], true) . "</pre>";
-                }
-            }
+            $this->lanzarDump([
+                'prueba' => ["datos" => $datos, "referenceCode" => $referenceCode, "Payment" => $this->payment],
+            ]);
             if (!$payment) {
                 $noexiste = true;
             } else {
@@ -174,7 +173,7 @@ class PaymentPassHandler
                     $this->payment = new PaymentPass();
                 } else {
                     if ($this->isJsonString($this->payment->creation_data)) {
-                        $curConfig = $this->translateConfig(json_decode($this->payment->creation_data, true), $curConfig, [], false);
+                        $curConfig = (new PaymentPassTranslator(json_decode($this->payment->creation_data, true), $curConfig, $this->config, false))->translate();
                     }
                 }
                 if (!Arr::get($curConfig, "production", false)) {
@@ -243,11 +242,9 @@ class PaymentPassHandler
                         $this->payment->save();
                     }
                 }
-                if (!Arr::get($curConfig, "production", false) && Arr::get($curConfig, "mostrarEchos", false)) {
-                    if ($request->isMethod('get')) {
-                        echo "<p></p><pre>" . print_r(["datos" => $datos, "Payment" => $this->payment], true) . "</pre>";
-                    }
-                }
+                $this->lanzarDump([
+                    "after save" => ["datos" => $datos, "Payment" => $this->payment]
+                ]);
 
                 if (in_array($state, Arr::get($curConfig, "service.state_codes.failure")) || Arr::has(Arr::get($curConfig, "service.state_codes.failure"), $state)) {
                     $callbackFunc = Arr::get($curConfig, "service.callbacks.failure", "");
@@ -367,14 +364,37 @@ class PaymentPassHandler
      * Execute an action from the configuration array, it could be an http request or an SDK call
      *
      * @param string $action The name of the action in the configuration array
+     * @param array $data The data information needed to process the action
+     * @param mix $default Optional The default value in case someting goes wrong, default is null
+     * @return mix The response from the request or the call, or the $default value if something goes wrong
+     */
+    public function action($action, array $data, $default = null)
+    {
+        if (Arr::has($this->config, "service.actions.$action")) {
+            return $this->execAction($action, Arr::get($this->config, "service.actions.$action", null), $this->config, $data, $default);
+        } else {
+            if (is_array($default)) {
+                data_set($default, "error", [
+                    "mensaje" => "Action '$action' no encontrada",
+                ]);
+            }
+        }
+        return $default;
+    }
+
+    /**
+     * Execute an action from the configuration array, it could be an http request or an SDK call
+     *
+     * @param string $action The name of the action in the configuration array
      * @param array $curConfig Current configuration, its updated
      * @param array $actionConfig Configuration of the current action
      * @param array $data The data information needed to process the action
      * @param mix $default Optional The default value in case someting goes wrong, default is null
      * @param boolean $con_preactions Optional If should run pre_actions or not, default true
+     * @param boolean $con_mapearRespuesta Optional If should map the response in actionConfig with the 'field_name' field fo the action, default true
      * @return mix The response from the request or the call, or the $default value if something goes wrong
      */
-    public function execAction($action, array $actionConfig, array $curConfig, array $data, $default = null, $con_preactions = true)
+    private function execAction($action, array $actionConfig, array $curConfig, array $data, $default = null, $con_preactions = true, $con_mapearRespuesta = true)
     {
         if ($actionConfig != null && is_array($actionConfig) && count($actionConfig) > 0) {
             $this->actualizarParametros($curConfig, $actionConfig, $data);
@@ -383,18 +403,32 @@ class PaymentPassHandler
                     if ($con_preactions && Arr::has($curConfig['service'], "pre_actions")) {
                         foreach (Arr::get($curConfig, "service.pre_actions", []) as $refName => $preActionConfig) {
                             $resultadoPre = $this->execAction($refName, $preActionConfig, $curConfig, $data, null, false);
-                            $this->mapearRespuesta($curConfig, $actionConfig, $resultadoPre, $data, $preActionConfig);
+                            $actionConfig['datosPre'][$refName] = $resultadoPre;
                         }
+                        $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $actionConfig))->just(['pre_action'])->translate();
                     }
-                    $datosDevolver = [];
-                    $this->mapearRespuesta($curConfig, $$datosDevolver, $this->callSdkFunction($actionConfig, $curConfig, $data), $data, $actionConfig, "");
+                    $this->lanzarDump(["llamando $action de {$this->service}" => [
+                        "actionConfig" => $actionConfig
+                    ]]);
+                    $resultadoAction = $this->callSdkFunction($actionConfig, $curConfig, $data);
+                    if ($con_mapearRespuesta) {
+                        $datosDevolver = [];
+                        $this->mapearRespuesta($curConfig, $datosDevolver, $resultadoAction, $data, $actionConfig, "");
+                    } else {
+                        $datosDevolver = $resultadoAction;
+                    }
+                    $this->lanzarDump(["resultado $action de {$this->service}" => [
+                        "resultadoAction" => $resultadoAction,
+                        "datosDevolver" => $datosDevolver
+                    ]]);
                     return $datosDevolver;
                 } elseif ($actionConfig['type'] == "http") {
                     if ($con_preactions && Arr::has($curConfig['service'], "pre_actions")) {
                         foreach (Arr::get($curConfig, "service.pre_actions", []) as $refName => $preActionConfig) {
                             $resultadoPre = $this->execAction($refName, $preActionConfig, $curConfig, $data, null, false);
-                            $this->mapearRespuesta($curConfig, $actionConfig, $resultadoPre, $data, $preActionConfig);
+                            $actionConfig['datosPre'][$refName] = $resultadoPre;
                         }
+                        $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $actionConfig))->just(['pre_action'])->translate();
                     }
                     $httpRequest = Http::retry(3, 100);
                     if (count(Arr::get($actionConfig, 'headers', [])) > 0) {
@@ -408,15 +442,49 @@ class PaymentPassHandler
                         $httpRequest = $httpRequest->withToken(Arr::get($actionConfig, 'authentication.token', ''));
                     }
                     if (in_array(Arr::get($actionConfig, 'method', ''), ['get', 'post', 'put', 'patch', 'delete']) && Arr::get($actionConfig, 'action', '') != '') {
-                        $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], Arr::get($actionConfig, 'call_parameters', []));
-                        if ($response->successful()) {
-                            $datosDevolver = [];
-                            $this->mapearRespuesta($curConfig, $$datosDevolver, $response->json(), $data, $actionConfig, "");
-                            return $datosDevolver;
-                        }
-                        if (!Arr::get($curConfig, "production", false) && Arr::get($curConfig, "mostrarEchos", false) && $response->failed()) {
-                            if (!request()->wantsJson()) {
-                                echo "<p>error http request {$action}: {$response->status()}</p><pre>" . print_r($response->json(), true) . "</pre>{$response->body()}";
+                        $this->lanzarDump(["llamando $action de {$this->service}" => [
+                            "actionConfig" => $actionConfig
+                        ]]);
+                        try {
+                            $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], Arr::get($actionConfig, 'call_parameters', []));
+                            if ($response->successful()) {
+                                if ($con_mapearRespuesta) {
+                                    $datosDevolver = [];
+                                    $this->mapearRespuesta($curConfig, $datosDevolver, $response->json(), $data, $actionConfig, "");
+                                } else {
+                                    $datosDevolver = $response->json();
+                                }
+                                $this->lanzarDump(["resultado $action de {$this->service}" => [
+                                    "response" => $response->json(),
+                                    "datosDevolver" => $datosDevolver
+                                ]]);
+                                return $datosDevolver;
+                            } else {
+                                $response->throw();
+                            }
+                        } catch (RequestException $e) {
+                            $this->lanzarDump(["request error en {$action} de {$this->service}" => [
+                                "mensaje" => $e->getMessage(),
+                                "response" => $e->response->json(),
+                                "body" => $e->response->body(),
+                                "actionConfig" => $actionConfig,
+                            ]]);
+                            if (is_array($default)) {
+                                data_set($default, "error", [
+                                    "mensaje" => $e->getMessage(),
+                                    "response" => $e->response->json(),
+                                    "body" => $e->response->body(),
+                                ]);
+                            }
+                        } catch (Exception $e) {
+                            $this->lanzarDump(["error en http {$action} de {$this->service}" => [
+                                "mensaje" => $e->getMessage(),
+                                "actionConfig" => $actionConfig,
+                            ]]);
+                            if (is_array($default)) {
+                                data_set($default, "error", [
+                                    "mensaje" => $e->getMessage(),
+                                ]);
                             }
                         }
                     }
@@ -470,33 +538,44 @@ class PaymentPassHandler
         if (($field_name = Arr::get($curActionConfig, "field_name", false)) && $result !== null) {
             if (is_string($field_name)) {
                 data_set($actionConfig, $preFieldsName . $field_name, $result);
-                $actionConfig = $this->translateConfig($data, $actionConfig, $curConfig);
+                $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
                 $reRevisar = true;
             } elseif (is_array($field_name)) {
                 foreach ($field_name as $keyField => $valueField) {
-                    if (is_string($keyField) && is_string($valueField) && $valueField !== null) {
+                    if ($valueField == "__all__" && is_string($keyField)) {
+                        data_set($actionConfig, $preFieldsName . $keyField, $result);
+                        $reRevisar = true;
+                    } elseif (($valueField == 'true' || $valueField == 'false') && is_string($keyField)) {
+                        data_set($actionConfig, $preFieldsName . $keyField, $valueField == 'true');
+                        $reRevisar = true;
+                    } elseif (is_string($keyField) && is_string($valueField) && $valueField !== null) {
                         if (is_array($result)) {
-                            data_set($actionConfig, $preFieldsName . $field_name, Arr::get($result, $valueField, $valueField));
+                            data_set($actionConfig, $preFieldsName . $keyField, Arr::get($result, $valueField, $valueField));
                             $reRevisar = true;
                         } elseif (is_object($result)) {
                             if (property_exists($result, $valueField)) {
                                 if (is_callable([$result, $valueField])) {
-                                    data_set($actionConfig, $preFieldsName . $field_name, $result->{$valueField}());
+                                    data_set($actionConfig, $preFieldsName . $keyField, $result->{$valueField}());
                                 } else {
-                                    data_set($actionConfig, $preFieldsName . $field_name, $result->{$valueField});
+                                    data_set($actionConfig, $preFieldsName . $keyField, $result->{$valueField});
                                 }
                                 $reRevisar = true;
                             }
                         } else {
-                            data_set($actionConfig, $preFieldsName . $field_name, $result);
+                            data_set($actionConfig, $preFieldsName . $keyField, $result);
                             $reRevisar = true;
                         }
+                    } elseif (count($field_name) == 1 && is_string($valueField)) {
+                        data_set($actionConfig, $preFieldsName . $valueField, $result);
+                        $reRevisar = true;
                     }
                 }
             }
+        } elseif (count($actionConfig) == 0 && $result != null) {
+            $actionConfig = $result;
         }
         if ($reRevisar) {
-            $actionConfig = $this->translateConfig($data, $actionConfig, $curConfig);
+            $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
         }
     }
 
@@ -510,55 +589,62 @@ class PaymentPassHandler
      * @param array $data The data information needed to process the update
      *
      */
-    private function actualizarParametros(&$curConfig, &$actionConfig, $data)
+    private function actualizarParametros(&$curConfig, &$actionConfig, $data = [])
     {
         if (!Arr::get($curConfig, 'service.referenceCode.ya_procesado', false)) {
             $curConfig['service']['referenceCode']['value'] = $this->generateResponseCode($data);
             $curConfig['service']['referenceCode']['ya_procesado'] = true;
-            $curConfig = $this->translateConfig($data, $curConfig, $curConfig);
+            $curConfig = (new PaymentPassTranslator($data, $curConfig, $curConfig))->translate();
         }
         foreach (Arr::get($curConfig, "service.responses", []) as $responseName => $responseData) {
             $responseUrl = Arr::get($responseData, "url", "");
             if ($responseUrl == "") {
                 $curConfig['service']['responses'][$responseName]['url'] = route("paymentpass::response", ["service" => $this->service, "responseType" => $responseName]);
             }
-            data_set($actionConfig, 'call_parameters.' . Arr::get($curConfig, "service.responses." . $responseName . ".url_field_name"), Arr::get($curConfig, "service.responses." . $responseName . ".url", ""));
-        }
-        if (!Arr::get($actionConfig, 'signature.ya_procesado', false)) {
-            if (Arr::get($actionConfig, "signature.active", false)) {
-                $strHash = "";
-                $preHash = "";
-                foreach (Arr::get($actionConfig, "signature.fields", "~") as $parameter) {
-                    $strHash .= $preHash . $parameter;
-                    $preHash = Arr::get($actionConfig, "signature.separator", "~");
-                }
-                switch (Arr::get($actionConfig, "signature.encryption", "md5")) {
-                    case "sha256":
-                        $actionConfig['signature']['value'] = Hash::make($strHash);
-                        break;
-                    case "sha1":
-                        $actionConfig['signature']['value'] = sha1($strHash);
-                        break;
-                    default:
-                    case "md5":
-                        $actionConfig['signature']['value'] = md5($strHash);
-                        break;
-                }
-                $actionConfig['signature']['ya_procesado'] = true;
+            if (Arr::get($curConfig, "service.responses." . $responseName . ".url_field_name", "") != "") {
+                data_set($curConfig, 'service.parameters.' . Arr::get($curConfig, "service.responses." . $responseName . ".url_field_name"), Arr::get($curConfig, "service.responses." . $responseName . ".url", ""));
             }
-            $actionConfig = $this->translateConfig($data, $actionConfig, $curConfig);
+        }
+        if ($actionConfig != null) {
+            $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
+            if (!Arr::get($actionConfig, 'signature.ya_procesado', false)) {
+                if (Arr::get($actionConfig, "signature.active", false)) {
+                    $strHash = "";
+                    $preHash = "";
+                    foreach (Arr::get($actionConfig, "signature.fields", "~") as $parameter) {
+                        $strHash .= $preHash . $parameter;
+                        $preHash = Arr::get($actionConfig, "signature.separator", "~");
+                    }
+                    switch (Arr::get($actionConfig, "signature.encryption", "md5")) {
+                        case "sha256":
+                            $actionConfig['signature']['value'] = Hash::make($strHash);
+                            break;
+                        case "sha1":
+                            $actionConfig['signature']['value'] = sha1($strHash);
+                            break;
+                        case "base64":
+                            $actionConfig['signature']['value'] = base64_encode($strHash);
+                            break;
+                        default:
+                        case "md5":
+                            $actionConfig['signature']['value'] = md5($strHash);
+                            break;
+                    }
+                    $actionConfig['signature']['ya_procesado'] = true;
+                }
+                if (Arr::get($actionConfig, "signature.send", false)) {
+                    data_set($actionConfig, 'call_parameters.' . Arr::get($actionConfig, "signature.field_name"), Arr::get($actionConfig, "signature.value", ""));
+                }
+                $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $actionConfig))->except(['pre_action'])->translate();
+            }
+            if (Arr::get($actionConfig, "signature.send", false)) {
+                data_set($actionConfig, 'call_parameters.' . Arr::get($actionConfig, "signature.field_name"), Arr::get($actionConfig, "signature.value", ""));
+            }
         }
         if (Arr::get($curConfig, "service.referenceCode.send", false)) {
-            data_set($actionConfig, 'call_parameters.' . Arr::get($curConfig, "service.referenceCode.field_name"), Arr::get($curConfig, "service.referenceCode.value", ""));
+            data_set($curConfig, 'service.parameters.' . Arr::get($curConfig, "service.referenceCode.field_name"), Arr::get($curConfig, "service.referenceCode.value", ""));
         }
-        if (Arr::get($actionConfig, "signature.send", false)) {
-            data_set($actionConfig, 'call_parameters.' . Arr::get($actionConfig, "signature.field_name"), Arr::get($actionConfig, "signature.value", ""));
-        }
-        if (!Arr::get($curConfig, "production", false) && Arr::get($curConfig, "mostrarEchos", false)) {
-            if (!request()->wantsJson()) {
-                echo "<p>Lats_configuration pre_sdk</p><pre>" . print_r($curConfig, true) . "</pre>";
-            }
-        }
+        $this->lanzarDump(['Last Configuration' => $curConfig]);
     }
 
     /**
@@ -584,6 +670,49 @@ class PaymentPassHandler
         } else {
             return $redirectResult;
         }
+    }
+
+    /**
+     * Call a view with a form to tokenize information.
+     * Uses the form array of the service configuration array
+     *
+     * @param array $data The data information needed to process the redirection
+     * @param boolean $pre_renderView If the view should be rendered before returning it. The result would be a string. Default, true
+     * @return \Illuminate\View\View | \Illuminate\Contracts\View\Factory | string
+     */
+    public function loadTokenForm(array $data = [], $pre_renderView = true)
+    {
+        $curConfig = $this->config;
+        $actionConfig = null;
+        $this->actualizarParametros($curConfig, $actionConfig, $data);
+        $formConfig = Arr::get($curConfig, "service.form", []);
+        foreach (Arr::get($curConfig, "service.pre_actions", []) as $refName => $preActionConfig) {
+            $resultadoPre = $this->execAction($refName, $preActionConfig, $curConfig, $data, null, false, false);
+            $formConfig['datosPre'][$refName] = $resultadoPre;
+            //$this->mapearRespuesta($curConfig, $curConfig, $resultadoPre, $data, $preActionConfig, "service.parameters.");
+        }
+        $formConfig = (new PaymentPassTranslator($data, $formConfig, $curConfig))->translate();
+        $formConfig = (new PaymentPassTranslator($data, $formConfig, $formConfig))->just(['pre_action'])->translate();
+
+        if (Arr::get($formConfig, "id", "") == "") {
+            $formConfig["id"] = "paymentpass_{$this->service}";
+        }
+        $this->lanzarDump(["para form" => [
+            'config' => Arr::except($curConfig, ["service.actions", "service.form", "service.responses"]),
+            'formConfig' => $formConfig,
+            'service' => $this->service,
+            'datos' => $data,
+        ]]);
+        $view = view('paymentpass::form', [
+            'config' => $curConfig,
+            'formConfig' => $formConfig,
+            'service' => $this->service,
+            'datos' => $data,
+        ]);
+        if ($pre_renderView) {
+            return $view->render();
+        }
+        return $view;
     }
 
     /**
@@ -635,13 +764,15 @@ class PaymentPassHandler
             $createParameters = Arr::get($actionConfig, 'create_parameters', "");
             $objeto = $this->getInstanceSdk($className, $callType, $createParameters, $curConfig, $data);
             $functionName = $actionConfig['name'];
+            $resultado = [];
             if (Arr::has($actionConfig, "pre_functions")) {
                 foreach (Arr::get($actionConfig, "pre_functions", []) as $preFunctionName => $preCallParameters) {
-                    $this->callInstanceSdk($objeto, "", $preFunctionName, $preCallParameters, $curConfig, $data);
+                    $resultado[$preFunctionName] = $this->callInstanceSdk($objeto, "", $preFunctionName, $preCallParameters, $curConfig, $data);
                 }
             }
             $callParameters = Arr::get($actionConfig, 'call_parameters', null);
-            return $this->callInstanceSdk($objeto, $callType, $functionName, $callParameters, $curConfig, $data);
+            $resultado[$functionName] = $this->callInstanceSdk($objeto, $callType, $functionName, $callParameters, $curConfig, $data);
+            return $resultado;
         }
         return null;
     }
@@ -665,6 +796,9 @@ class PaymentPassHandler
                 if (!is_array($createParameters)) {
                     $createParameters = [$createParameters];
                 }
+                $this->lanzarDump([
+                    'llendo a crear' => [$className, $callType, $createParameters]
+                ]);
                 $reflection = new ReflectionClass($className);
                 $objeto = $reflection->newInstanceArgs($createParameters);
             }
@@ -710,13 +844,13 @@ class PaymentPassHandler
                     }
                     $result = null;
                     if ($callParameters === null || $callParameters == "" && $method->getNumberOfParameters() == 0) {
-                        $result = $method->invoke(($callType == 'static') ? $objeto : null);
+                        $result = $method->invoke(($callType != 'static') ? $objeto : null);
                     } else {
                         $callParameters = $this->translate_parameters($callParameters, $curConfig, $data);
                         if (!is_array($callParameters) && $method->getNumberOfParameters() == 1) {
-                            $result = $method->invoke(($callType == 'static') ? $objeto : null, $callParameters);
+                            $result = $method->invoke(($callType != 'static') ? $objeto : null, $callParameters);
                         } elseif (is_array($callParameters) && $method->getNumberOfParameters() <= count($callParameters)) {
-                            $result = $method->invokeArgs(($callType == 'static') ? $objeto : null, $callParameters);
+                            $result = $method->invokeArgs(($callType != 'static') ? $objeto : null, $callParameters);
                         }
                     }
                     return $result;
@@ -728,7 +862,10 @@ class PaymentPassHandler
                             } else {
                                 $objeto_name = $objeto;
                             }
-                            echo "<p>error calling {$functionName} in {$objeto_name} con argumentos:</p><pre>" . print_r($callParameters, true) . "</pre><p>{$e->message}</p>";
+                            $this->lanzarDump([
+                                "error calling {$functionName} in {$objeto_name} con argumentos" => $callParameters,
+                                'exception' => $e
+                            ]);
                         }
                     }
                     return null;
@@ -759,26 +896,26 @@ class PaymentPassHandler
                 $aux = str_replace('__service_parameters__', '', $param_config_array);
                 return Arr::get($service['parameters'], $aux, $aux);
             } else {
-                $item = $this->translateString($param_config_array, "__route__", "route");
-                $item = $this->translateString($item, "__url__", "url");
+                $item = PaymentPassTranslator::translateString($param_config_array, "__route__", "route");
+                $item = PaymentPassTranslator::translateString($item, "__url__", "url");
                 if (function_exists('trans_article')) {
-                    $item = $this->translateString($item, "__trans_article__", "trans_article");
+                    $item = PaymentPassTranslator::translateString($item, "__trans_article__", "trans_article");
                 }
-                $item = $this->translateString($item, "__data__", "data", $data);
-                $item = $this->translateString($item, "__request__", "data", $data);
-                $item = $this->translateString($item, "__trans__", "trans");
-                $item = $this->translateString($item, "__asset__", "asset");
-                $item = $this->translateString($item, "__session_id__", "session_id");
-                $item = $this->translateString($item, "__device_session_id__", "device_session_id");
-                $item = $this->translateString($item, "__ip_address__", "ip_address");
-                $item = $this->translateString($item, "__user_agent__", "user_agent");
-                $item = $this->translateString($item, "__config_paymentpass__", "config_paymentpass", $data, $config);
+                $item = PaymentPassTranslator::translateString($item, "__data__", "data", $data);
+                $item = PaymentPassTranslator::translateString($item, "__request__", "data", $data);
+                $item = PaymentPassTranslator::translateString($item, "__trans__", "trans");
+                $item = PaymentPassTranslator::translateString($item, "__asset__", "asset");
+                $item = PaymentPassTranslator::translateString($item, "__session_id__", "session_id");
+                $item = PaymentPassTranslator::translateString($item, "__device_session_id__", "device_session_id");
+                $item = PaymentPassTranslator::translateString($item, "__ip_address__", "ip_address");
+                $item = PaymentPassTranslator::translateString($item, "__user_agent__", "user_agent");
+                $item = PaymentPassTranslator::translateString($item, "__config_paymentpass__", "config_paymentpass", $data, $config);
                 return $item;
             }
         } else {
             $return_params = [];
-            foreach ($param_config_array as $config_parameter) {
-                $return_params[] = $this->translate_parameters($config_parameter, $config, $data);
+            foreach ($param_config_array as $keyParameter => $config_parameter) {
+                $return_params[$keyParameter] = $this->translate_parameters($config_parameter, $config, $data);
             }
             return $return_params;
         }
@@ -831,7 +968,7 @@ class PaymentPassHandler
      */
     private function generateResponseCode(array $data = [], PaymentPass $payment = null)
     {
-        $curConfig = $this->translateConfig($data);
+        $curConfig = (new PaymentPassTranslator($data, $this->config, $this->config))->translate();
         if ($payment) {
             $referenceCode = $payment->id;
         } elseif ($this->payment) {
@@ -852,6 +989,9 @@ class PaymentPassHandler
                     break;
                 case "sha1":
                     $referenceCode = sha1($strHash);
+                    break;
+                case "base64":
+                    $referenceCode = base64_encode($strHash);
                     break;
                 default:
                 case "md5":
@@ -968,237 +1108,12 @@ class PaymentPassHandler
         }
     }
 
-    /**
-     *  Evaluate functions inside the config array, such as trans(), route(), url() etc.
-     *
-     * @param array $data Optional The data as extra parameters
-     * @param array $config Optional The config so far array to translate
-     * @param array $configComplete Optional The complet config array to translate
-     * @param boolean $request Optional If is translating with request as data
-     * @return array The operated config array
-     */
-    public function translateConfig(array $data = [], array $config = [], array $configComplete = [], $request = false)
+    private function lanzarDump($datos)
     {
-        if (count($config) > 0) {
-            $array = $config;
-        } else {
-            $array = $this->config;
-            //echo "<p>array</p><pre>" . print_r($data,true) . "</pre>";
-        }
-        if (count($configComplete) == 0) {
-            $configComplete = $this->config;
-        }
-        $result = [];
-        foreach ($array as $key => $item) {
-            if (gettype($item) != "Closure Object") {
-                if (is_array($item)) {
-                    $result[$key] = $this->translateConfig($data, $item, $configComplete, $request);
-                } elseif (is_string($item)) {
-                    $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
-                    $item = $this->translateString($item, "__route__", "route");
-                    $item = $this->translateString($item, "__url__", "url");
-                    if (function_exists('trans_article')) {
-                        $item = $this->translateString($item, "__trans_article__", "trans_article");
-                    }
-                    if (!$request) {
-                        $item = $this->translateString($item, "__data__", "data", $data);
-                    } else {
-                        $item = $this->translateString($item, "__request__", "data", $data);
-                    }
-                    $item = $this->translateString($item, "__trans__", "trans");
-                    $item = $this->translateString($item, "__asset__", "asset");
-                    $item = $this->translateString($item, "__session_id__", "session_id");
-                    $item = $this->translateString($item, "__device_session_id__", "device_session_id");
-                    $item = $this->translateString($item, "__ip_address__", "ip_address");
-                    $item = $this->translateString($item, "__user_agent__", "user_agent");
-                    $item = $this->translateString($item, "__config_paymentpass__", "config_paymentpass", $configComplete, $result);
-                    $item = $this->translateString($item, "__auto__", "auto", $data, $result);
-                    $item = $this->translateString($item, "__auto__", "auto", $data, $result);
-                    $result[$key] = $item;
-                } else {
-                    $result[$key] = $item;
-                }
-            } else {
-                $result[$key] = $item;
+        if (!Arr::get($this->config, "production", false) && Arr::get($this->config, "mostrarEchos", false)) {
+            if (!request()->wantsJson()) {
+                dump($datos);
             }
-        }
-        return $result;
-    }
-
-    /**
-     * Use the prefixes to change strings in config array to evaluate
-     * functions such as route(), trans(), url(), etc.
-     *
-     * For parameters, use ', ' to separate them inside the prefix and the close.
-     *
-     * For array, use json notation inside comas
-     *
-     * @param string $item The string to operate
-     * @param string $prefix The prefix for the function
-     * @param string $function The name of the function to evaluate
-     * @param array $data Optional, The data with optional parameters
-     * @param array $config Optional, The complete config so far
-     * @param string $close Optional, the closing string for the prefix, default is '__'
-     * @return string The string with the results of the evaluations
-     */
-    private function translateString($item, $prefix, $function, $data = [], $config = [], $close = "__")
-    {
-        if (isset($item)) {
-            $result = "";
-            if (Str::contains($item, $prefix)) {
-                if (($left = (stripos($item, $prefix))) !== false) {
-                    while ($left !== false) {
-                        if (($right = stripos($item, $close, $left + strlen($prefix))) === false) {
-                            $right = strlen($item);
-                        }
-                        $textPiece = substr($item, $left + strlen($prefix), $right - ($left + strlen($prefix)));
-                        $piece = $textPiece;
-                        if (Str::contains($textPiece, "{")) {
-                            $auxLeft = (stripos($textPiece, "{"));
-                            $auxRight = stripos($textPiece, "}", $left) + 1;
-                            $auxJson = substr($textPiece, $auxLeft, $auxRight - $auxLeft);
-                            $textPiece = str_replace($auxJson, "*****", $textPiece);
-                            $auxJson = str_replace(["'", ", }"], ['"', "}"], $auxJson);
-                            $auxArr = explode(",", str_replace([" ,", ", "], [",", ","], $textPiece));
-                            if ($auxIndex = array_search("*****", $auxArr)) {
-                                $auxArr[$auxIndex] = json_decode($auxJson, true);
-                            } else {
-                                $auxArr[] = json_decode($auxJson, true);
-                            }
-                            $piece = call_user_func_array($function, $auxArr);
-                        } else {
-                            if ($function == 'config_paymentpass') {
-                                $piece = $this->getValorDesde($textPiece, $data, $config);
-                            } elseif ($function == 'ip_address') {
-                                $piece = $_SERVER['REMOTE_ADDR'];
-                            } elseif ($function == 'user_agent') {
-                                $piece = $_SERVER['HTTP_USER_AGENT'];
-                            } elseif ($function == 'session_id') {
-                                $piece = session_id();
-                            } elseif ($function == 'device_session_id') {
-                                $piece = md5(session_id() . microtime());
-                            } elseif ($function == 'data') {
-                                $piece = $this->getValor($textPiece, $data);
-                            } elseif ($function == 'auto') {
-                                $datos = explode("|", $textPiece);
-                                if (count($datos) > 2) {
-                                    $datosParameters = explode(",", $datos[1]);
-                                    $datosFields = explode(",", $datos[2]);
-                                } elseif (count($datos) > 1) {
-                                    $datosParameters = explode(",", $datos[1]);
-                                    $datosFields = [];
-                                } else {
-                                    $datosParameters = [];
-                                    $datosFields = [];
-                                }
-                                switch ($datos[0]) {
-                                    case "taxReturnBase":
-                                        if (count($datosParameters) == 3) {
-                                            $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
-                                            $valor = (float) $this->getValorDesde($datosParameters[1], $data, $config);
-                                            try {
-                                                $piece = number_format(($valor / (1 + $impuesto)), $datosParameters[2], ".", "");
-                                            } catch (Exception $exc) {
-                                                $piece = "";
-                                            }
-                                        } else {
-                                            $piece = "";
-                                        }
-                                        break;
-                                    case "tax":
-                                        if (count($datosParameters) == 3) {
-                                            $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
-                                            $base = (float) $this->getValorDesde($datosParameters[1], $data, $config);
-                                            try {
-                                                $piece = number_format(($base * $impuesto), $datosParameters[2], ".", "");
-                                            } catch (Exception $exc) {
-                                                $piece = "";
-                                            }
-                                        } else {
-                                            $piece = "";
-                                        }
-                                        break;
-                                    case "valueToPay":
-                                        if (count($datosParameters) == 3) {
-                                            $impuesto = (float) $this->getValorDesde($datosParameters[0], $data, $config);
-                                            $base = (float) $this->getValorDesde($datosParameters[1], $data, $config);
-                                            try {
-                                                $piece = number_format($base * (1 + $impuesto), $datosParameters[2], ".", "");
-                                            } catch (Exception $exc) {
-                                                $piece = "";
-                                            }
-                                        } else {
-                                            $piece = "";
-                                        }
-                                        break;
-                                    default:
-                                        $piece = $textPiece;
-                                        break;
-                                }
-                            } else {
-                                $piece = call_user_func($function, $textPiece);
-                            }
-                        }
-                        if (is_string($piece)) {
-                            if ($right <= strlen($item)) {
-                                $item = substr($item, 0, $left) . $piece . substr($item, $right + 2);
-                            } else {
-                                $item = substr($item, 0, $left) . $piece;
-                            }
-                            $left = (stripos($item, $prefix));
-                        } else {
-                            $item = $piece;
-                            $left = false;
-                        }
-                    }
-                }
-                $result = $item;
-            } else {
-                $result = $item;
-            }
-            return $result;
-        }
-        return $item;
-    }
-
-    /**
-     * Get the value of a key inside nested arrays
-     * @param string $dato key
-     * @param array $config1 firts array to look in
-     * @param array $config2 second array to look in
-     * @return mix The value found or $dato
-     */
-    private function getValorDesde($dato, $config1, $config2)
-    {
-        $aux = $this->getValor($dato, $config1);
-        if ($aux == $dato) {
-            $aux = $this->getValor($dato, $config2);
-        }
-        return $aux;
-    }
-
-    /**
-     * Get the value of a key inside a nested array
-     * @param string $dato key
-     * @param array $data the array to look in
-     * @return mix The value found or $dato
-     */
-    private function getValor($dato, $data)
-    {
-        if (!is_array($data)) {
-            return $dato;
-        } elseif (Arr::has($data, $dato)) {
-            return Arr::get($data, $dato, $dato);
-        } else {
-            foreach ($data as $key => $item) {
-                if (is_array($item)) {
-                    $aux = $this->getValor($dato, $item);
-                    if ($aux != $dato) {
-                        return $aux;
-                    }
-                }
-            }
-            return $dato;
         }
     }
 }
