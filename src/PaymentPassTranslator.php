@@ -93,7 +93,12 @@ class PaymentPassTranslator
         $this->except($this->except);
     }
 
-    function except(array $exceptThisFunctions)
+    /**
+     * Use all translation functions except fot this ones
+     * @param array $exceptThisFunctions List of functions to discard
+     * @return PaymentPassTranslator
+     */
+    public function except(array $exceptThisFunctions)
     {
         $functions = [];
         foreach ($this->functions as $function) {
@@ -105,7 +110,12 @@ class PaymentPassTranslator
         return $this;
     }
 
-    function just(array $justThisFunctions)
+    /**
+     * Use only this translation functions
+     * @param array $justThisFunctions List of functions to use
+     * @return PaymentPassTranslator
+     */
+    public function just(array $justThisFunctions)
     {
         $functions = [];
         foreach ($this->functions as $function) {
@@ -117,9 +127,19 @@ class PaymentPassTranslator
         return $this;
     }
 
-    public function translate()
+    /**
+     * Translate de configuration array
+     *
+     * @param array $config Optional The config so far array to translate, if null will use the initial one
+     * @return array The configuration translated
+     */
+    public function translate($config = null)
     {
-        $array = $this->config;
+        if ($config == null) {
+            $array = $this->config;
+        } else {
+            $array = $config;
+        }
         $configComplete = $this->configComplete;
         $data = $this->data;
         $request = $this->request;
@@ -127,7 +147,7 @@ class PaymentPassTranslator
         foreach ($array as $key => $item) {
             if (gettype($item) != "Closure Object") {
                 if (is_array($item) && count($item) > 0) {
-                    $result[$key] = $this->translate($data, $item, $configComplete, $request);
+                    $result[$key] = $this->translate($item);
                 } elseif (is_string($item)) {
                     $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
 
@@ -148,7 +168,7 @@ class PaymentPassTranslator
                     $item = $this->transString($item, "__ip_address__", "ip_address");
                     $item = $this->transString($item, "__user_agent__", "user_agent");
                     $item = $this->transString($item, "__config_action__", "config_action", $configComplete, $result);
-                    $item = $this->transString($item, "__pre_action__", "pre_action", Arr::get($configComplete, "datosPre",[]), $result);
+                    $item = $this->transString($item, "__pre_action__", "pre_action", Arr::get($configComplete, "datosPre", []), $result);
                     $item = $this->transString($item, "__config_paymentpass__", "config_paymentpass", $configComplete, $result);
                     $item = $this->transString($item, "__auto__", "auto", $data, $result);
                     $item = $this->transString($item, "__auto__", "auto", $data, $result);
@@ -179,7 +199,8 @@ class PaymentPassTranslator
      * @param string $close Optional, the closing string for the prefix, default is '__'
      * @return string The string with the results of the evaluations
      */
-    private function transString($item, $prefix, $function, $data = [], $config = [], $close = "__"){
+    private function transString($item, $prefix, $function, $data = [], $config = [], $close = "__")
+    {
         if (in_array($function, $this->functionsToProcess)) {
             return PaymentPassTranslator::translateString($item, $prefix, $function, $data, $config, $close);
         }
@@ -204,130 +225,143 @@ class PaymentPassTranslator
      */
     public static function translateString($item, $prefix, $function, $data = [], $config = [], $close = "__")
     {
-            if (isset($item)) {
-                $result = "";
-                if (Str::contains($item, $prefix)) {
-                    if (($left = (stripos($item, $prefix))) !== false) {
-                        while ($left !== false) {
-                            if (($right = stripos($item, $close, $left + strlen($prefix))) === false) {
-                                $right = strlen($item);
-                            }
-                            $textPiece = substr($item, $left + strlen($prefix), $right - ($left + strlen($prefix)));
-                            $piece = $textPiece;
-                            if (Str::contains($textPiece, "{")) {
-                                $auxLeft = (stripos($textPiece, "{"));
-                                $auxRight = stripos($textPiece, "}", $left) + 1;
-                                $auxJson = substr($textPiece, $auxLeft, $auxRight - $auxLeft);
-                                $textPiece = str_replace($auxJson, "*****", $textPiece);
-                                $auxJson = str_replace(["'", ", }"], ['"', "}"], $auxJson);
-                                $auxArr = explode(",", str_replace([" ,", ", "], [",", ","], $textPiece));
-                                if ($auxIndex = array_search("*****", $auxArr)) {
-                                    $auxArr[$auxIndex] = json_decode($auxJson, true);
-                                } else {
-                                    $auxArr[] = json_decode($auxJson, true);
-                                }
-                                $piece = call_user_func_array($function, $auxArr);
+        if (isset($item)) {
+            $result = "";
+            if (Str::contains($item, $prefix)) {
+                if (($left = (stripos($item, $prefix))) !== false) {
+                    while ($left !== false) {
+                        if (($right = stripos($item, $close, $left + strlen($prefix))) === false) {
+                            $right = strlen($item);
+                        }
+                        $textPiece = substr($item, $left + strlen($prefix), $right - ($left + strlen($prefix)));
+                        $piece = $textPiece;
+                        if (Str::contains($textPiece, "{")) {
+                            $auxLeft = (stripos($textPiece, "{"));
+                            $auxRight = stripos($textPiece, "}", $left) + 1;
+                            $auxJson = substr($textPiece, $auxLeft, $auxRight - $auxLeft);
+                            $textPiece = str_replace($auxJson, "*****", $textPiece);
+                            $auxJson = str_replace(["'", ", }"], ['"', "}"], $auxJson);
+                            $auxArr = explode(",", str_replace([" ,", ", "], [",", ","], $textPiece));
+                            if ($auxIndex = array_search("*****", $auxArr)) {
+                                $auxArr[$auxIndex] = json_decode($auxJson, true);
                             } else {
-                                if ($function == 'config_paymentpass') {
-                                    $piece = PaymentPassTranslator::getValorDesde($textPiece, $data, $config);
-                                } elseif ($function == 'config_action') {
-                                    $piece = PaymentPassTranslator::getValorDesde($textPiece, $data, $config);
-                                } elseif ($function == 'pre_action') {
-                                    $piece = PaymentPassTranslator::getValorDesde($textPiece, $data, $config);
-                                } elseif ($function == 'ip_address') {
-                                    $piece = $_SERVER['REMOTE_ADDR'];
-                                } elseif ($function == 'user_agent') {
-                                    $piece = $_SERVER['HTTP_USER_AGENT'];
-                                } elseif ($function == 'session_id') {
-                                    $piece = session()->getId();
-                                } elseif ($function == 'device_session_id') {
-                                    $piece = md5(session()->getId() . microtime());
-                                } elseif ($function == 'data') {
-                                    $piece = PaymentPassTranslator::getValor($textPiece, $data);
-                                } elseif ($function == 'auto') {
-                                    $datos = explode("|", $textPiece);
-                                    if (count($datos) > 2) {
-                                        $datosParameters = explode(",", $datos[1]);
-                                        $datosFields = explode(",", $datos[2]);
-                                    } elseif (count($datos) > 1) {
-                                        $datosParameters = explode(",", $datos[1]);
-                                        $datosFields = [];
-                                    } else {
-                                        $datosParameters = [];
-                                        $datosFields = [];
-                                    }
-                                    switch ($datos[0]) {
-                                        case "taxReturnBase":
-                                            if (count($datosParameters) == 3) {
-                                                $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
-                                                $valor = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
-                                                try {
-                                                    $piece = number_format(($valor / (1 + $impuesto)), $datosParameters[2], ".", "");
-                                                } catch (Exception $exc) {
-                                                    $piece = "";
-                                                }
-                                            } else {
-                                                $piece = "";
-                                            }
-                                            break;
-                                        case "tax":
-                                            if (count($datosParameters) == 3) {
-                                                $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
-                                                $base = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
-                                                try {
-                                                    $piece = number_format(($base * $impuesto), $datosParameters[2], ".", "");
-                                                } catch (Exception $exc) {
-                                                    $piece = "";
-                                                }
-                                            } else {
-                                                $piece = "";
-                                            }
-                                            break;
-                                        case "valueToPay":
-                                            if (count($datosParameters) == 3) {
-                                                $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
-                                                $base = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
-                                                try {
-                                                    $piece = number_format($base * (1 + $impuesto), $datosParameters[2], ".", "");
-                                                } catch (Exception $exc) {
-                                                    $piece = "";
-                                                }
-                                            } else {
-                                                $piece = "";
-                                            }
-                                            break;
-                                        default:
-                                            $piece = $textPiece;
-                                            break;
-                                    }
-                                } else {
-                                    $piece = call_user_func($function, $textPiece);
-                                }
+                                $auxArr[] = json_decode($auxJson, true);
                             }
-                            if (is_object($piece) || is_array($piece)) {
-                                $piece = json_encode($piece);
-                            } elseif (is_bool($piece)) {
-                                $piece = ($piece) ? "true" : "false";
-                            }
-                            if (is_string($piece) || is_numeric($piece)) {
-                                if ($right <= strlen($item)) {
-                                    $item = substr($item, 0, $left) . $piece . substr($item, $right + 2);
+                            $piece = call_user_func_array($function, $auxArr);
+                        } else {
+                            if ($function == 'config_paymentpass') {
+                                $piece = PaymentPassTranslator::getValorDesde($textPiece, $data, $config);
+                            } elseif ($function == 'config_action') {
+                                $piece = PaymentPassTranslator::getValorDesde($textPiece, $data, $config);
+                            } elseif ($function == 'pre_action') {
+                                $piece = PaymentPassTranslator::getValorDesde($textPiece, $data, $config);
+                            } elseif ($function == 'ip_address') {
+                                $piece = $_SERVER['REMOTE_ADDR'];
+                            } elseif ($function == 'user_agent') {
+                                $piece = $_SERVER['HTTP_USER_AGENT'];
+                            } elseif ($function == 'session_id') {
+                                $piece = session()->getId();
+                            } elseif ($function == 'device_session_id') {
+                                $piece = md5(session()->getId() . microtime());
+                            } elseif ($function == 'data') {
+                                $piece = PaymentPassTranslator::getValor($textPiece, $data);
+                            } elseif ($function == 'auto') {
+                                $datos = explode("|", $textPiece);
+                                if (count($datos) > 2) {
+                                    $datosParameters = explode(",", $datos[1]);
+                                    $datosFields = explode(",", $datos[2]);
+                                } elseif (count($datos) > 1) {
+                                    $datosParameters = explode(",", $datos[1]);
+                                    $datosFields = [];
                                 } else {
-                                    $item = substr($item, 0, $left) . $piece;
+                                    $datosParameters = [];
+                                    $datosFields = [];
                                 }
-                                $left = (stripos($item, $prefix));
+                                switch ($datos[0]) {
+                                    case "taxReturnBase":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
+                                            $valor = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                            try {
+                                                $piece = number_format(($valor / (1 + $impuesto)), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) {
+                                                $piece = "";
+                                            }
+                                        } else {
+                                            $piece = "";
+                                        }
+                                        break;
+                                    case "tax":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
+                                            $base = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                            try {
+                                                $piece = number_format(($base * $impuesto), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) {
+                                                $piece = "";
+                                            }
+                                        } else {
+                                            $piece = "";
+                                        }
+                                        break;
+                                    case "tax_inv":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
+                                            $valor = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                            try {
+                                                $piece = number_format($valor - ($valor / (1 + $impuesto)), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) {
+                                                $piece = "";
+                                            }
+                                        } else {
+                                            $piece = "";
+                                        }
+                                        break;
+                                    case "valueToPay":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
+                                            $base = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                            try {
+                                                $piece = number_format($base * (1 + $impuesto), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) {
+                                                $piece = "";
+                                            }
+                                        } else {
+                                            $piece = "";
+                                        }
+                                        break;
+                                    default:
+                                        $piece = $textPiece;
+                                        break;
+                                }
                             } else {
-                                $item = $piece;
-                                $left = false;
+                                $piece = call_user_func($function, $textPiece);
                             }
                         }
+                        if (is_object($piece) || is_array($piece)) {
+                            $piece = json_encode($piece);
+                        } elseif (is_bool($piece)) {
+                            $piece = ($piece) ? "true" : "false";
+                        }
+                        if (is_string($piece) || is_numeric($piece)) {
+                            if ($right <= strlen($item)) {
+                                $item = substr($item, 0, $left) . $piece . substr($item, $right + 2);
+                            } else {
+                                $item = substr($item, 0, $left) . $piece;
+                            }
+                            $left = (stripos($item, $prefix));
+                        } else {
+                            $item = $piece;
+                            $left = false;
+                        }
                     }
-                    $result = $item;
-                } else {
-                    $result = $item;
                 }
-                return $result;
+                $result = $item;
+            } else {
+                $result = $item;
             }
+            return $result;
+        }
         return $item;
     }
 
