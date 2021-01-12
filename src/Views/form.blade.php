@@ -56,7 +56,7 @@
         </div>
         <div class='{{ \Illuminate\Support\Arr::get($field, "div_input_class", "col-xs-12 col-sm-8 col-md-10") }}'>
             @if (\Illuminate\Support\Arr::get($field, "pre", "") != "" || \Illuminate\Support\Arr::get($field, "post", "") != "")
-            <div class="input-group {{ $claseError }}">
+            <div class="input-group {{ \Illuminate\Support\Arr::get($field, "div_input_group_class", "") }} {{ $claseError }}">
                 @endif
                 @if (\Illuminate\Support\Arr::get($field, "pre", "") != "")
                 @if (is_array($field["pre"]))
