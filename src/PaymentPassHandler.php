@@ -145,7 +145,7 @@ class PaymentPassHandler
             foreach (Arr::get($configResponse, "pre_actions", []) as $reference => $class_datos) {
                 if ($this->conditionsFunction(Arr::get($class_datos, "if", []), $curConfig, $datos)) {
                     if (Arr::get($class_datos, "field_name", "") != "") {
-                        $auxDatos = $this->execAction($reference, $class_datos, $curConfig, $datos);
+                        $auxDatos = $this->execAction($reference, $class_datos, $curConfig, $datos, null, false);
                         if (is_array($auxDatos) || is_object($auxDatos)) {
                             $auxDatos = json_decode(json_encode($auxDatos), true);
                             if (Arr::has($auxDatos, "body")) {
@@ -154,7 +154,7 @@ class PaymentPassHandler
                         }
                         $this->mapearRespuesta($curConfig, $datos, $auxDatos, $datos, $class_datos, "");
                     } else {
-                        $this->execAction($reference, $class_datos, $curConfig, $datos);
+                        $this->execAction($reference, $class_datos, $curConfig, $datos, null, false);
                     }
                 }
             }
@@ -394,11 +394,14 @@ class PaymentPassHandler
      * @param boolean $con_mapearRespuesta Optional If should map the response in actionConfig with the 'field_name' field fo the action, default true
      * @return mix The response from the request or the call, or the $default value if something goes wrong
      */
-    private function execAction($action, array $actionConfig, array $curConfig, array $data, $default = null, $con_preactions = true, $con_mapearRespuesta = true)
+    private function execAction($action, array $actionConfig, array $curConfig, array $data, $default = null, $con_preactions = null, $con_mapearRespuesta = true)
     {
         if ($actionConfig != null && is_array($actionConfig) && count($actionConfig) > 0) {
             $this->actualizarParametros($curConfig, $actionConfig, $data);
             if ($this->conditionsFunction(Arr::get($actionConfig, "if", []), $curConfig, $data)) {
+                if ($con_preactions === null) {
+                    $con_preactions = Arr::get($actionConfig, 'ejecutar_pre_actions', true);
+                }
                 if ($actionConfig['type'] == "sdk") {
                     if ($con_preactions && Arr::has($curConfig['service'], "pre_actions")) {
                         foreach (Arr::get($curConfig, "service.pre_actions", []) as $refName => $preActionConfig) {
@@ -449,8 +452,8 @@ class PaymentPassHandler
                             $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], Arr::get($actionConfig, 'call_parameters', []));
                             if ($response->successful()) {
                                 if ($con_mapearRespuesta) {
-                                        $datosDevolver = [];
-                                        $this->mapearRespuesta($curConfig, $datosDevolver, $response->json(), $data, $actionConfig, "");
+                                    $datosDevolver = [];
+                                    $this->mapearRespuesta($curConfig, $datosDevolver, $response->json(), $data, $actionConfig, "");
                                 } else {
                                     $datosDevolver = $response->json();
                                 }
@@ -686,10 +689,12 @@ class PaymentPassHandler
         $actionConfig = null;
         $this->actualizarParametros($curConfig, $actionConfig, $data);
         $formConfig = Arr::get($curConfig, "service.form", []);
-        foreach (Arr::get($curConfig, "service.pre_actions", []) as $refName => $preActionConfig) {
-            $resultadoPre = $this->execAction($refName, $preActionConfig, $curConfig, $data, null, false, false);
-            $formConfig['datosPre'][$refName] = $resultadoPre;
-            //$this->mapearRespuesta($curConfig, $curConfig, $resultadoPre, $data, $preActionConfig, "service.parameters.");
+        if (Arr::get($formConfig, 'ejecutar_pre_actions', true)) {
+            foreach (Arr::get($curConfig, "service.pre_actions", []) as $refName => $preActionConfig) {
+                $resultadoPre = $this->execAction($refName, $preActionConfig, $curConfig, $data, null, false, false);
+                $formConfig['datosPre'][$refName] = $resultadoPre;
+                //$this->mapearRespuesta($curConfig, $curConfig, $resultadoPre, $data, $preActionConfig, "service.parameters.");
+            }
         }
         $formConfig = (new PaymentPassTranslator($data, $formConfig, $curConfig))->translate();
         $formConfig = (new PaymentPassTranslator($data, $formConfig, $formConfig))->just(['pre_action'])->translate();
@@ -912,13 +917,14 @@ class PaymentPassHandler
                 $item = PaymentPassTranslator::translateString($item, "__config_paymentpass__", "config_paymentpass", $data, $config);
                 return $item;
             }
-        } else {
+        } elseif (count($param_config_array) > 0) {
             $return_params = [];
             foreach ($param_config_array as $keyParameter => $config_parameter) {
                 $return_params[$keyParameter] = $this->translate_parameters($config_parameter, $config, $data);
             }
             return $return_params;
         }
+        return $param_config_array;
     }
 
     /**
