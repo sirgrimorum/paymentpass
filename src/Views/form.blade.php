@@ -1,3 +1,6 @@
+<?php
+$serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
+?>
 <style>
     .alert:empty{
         display: none;
@@ -6,8 +9,8 @@
 <form
     action='{{ \Illuminate\Support\Arr::get($formConfig, "action", "") }}'
     method='{{ \Illuminate\Support\Arr::get($formConfig, "method", "POST") }}'
-    id='{{ \Illuminate\Support\Arr::get($formConfig, "id", "form_paymentpass_$service") }}'
-    class='{{ \Illuminate\Support\Arr::get($formConfig, "id", "") }}'
+    id='{{ \Illuminate\Support\Arr::get($formConfig, "id", "form_paymentpass_$serviceId") }}'
+    class='{{ \Illuminate\Support\Arr::get($formConfig, "class", "") }}'
     >
     @foreach(\Illuminate\Support\Arr::get($formConfig, "fields", []) as $field)
     <?php
@@ -98,27 +101,28 @@
     @endforeach
     <div class='{{ \Illuminate\Support\Arr::get($field, "div_class", "form-group row") }}'>
         <div class='{{ \Illuminate\Support\Arr::get($field, "button_div_class", "col-xs-offset-0 col-sm-offset-4 col-md-offset-2 col-xs-12 col-sm-8 col-md-10") }}'>
-            <button class='{{ \Illuminate\Support\Arr::get($field, "button_class", "btn btn-primary") }}'>
+            <button class='{{ \Illuminate\Support\Arr::get($field, "button_class", "btn btn-primary") }}' type="submit" form='{{ \Illuminate\Support\Arr::get($formConfig, "id", "form_paymentpass_$serviceId") }}'>
                 {{ \Illuminate\Support\Arr::get($field, "button_label", "Guardar") }}
             </button>
         </div>
     </div>
 </form>
 <script>
-    window.onload = function() {
+    window.addEventListener ? window.addEventListener("load",paymentpass_{{ $serviceId }}Inicio,false) : window.attachEvent && window.attachEvent("onload",paymentpass_{{ $serviceId }}Inicio);
+    function paymentpass_{{ $serviceId }}Inicio() {
         @if (count(\Illuminate\Support\Arr::get($formConfig, "include_scripts", [])) > 0)
             var pathScript = '{{ $formConfig["include_scripts"][0] }}';
             scriptLoader(pathScript,false,"");
             @if(count($formConfig["include_scripts"])>1)
-            scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"cargarScript1();");
+            scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"cargarScript1Para{{ $serviceId }}();");
             @else
-            scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"todoCargado();");
+            scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"todoCargadoPara{{ $serviceId }}();");
             @endif
         @else
-            todoCargado();
+            todoCargadoPara{{ $serviceId }}();
         @endif
 
-        $('#{{ \Illuminate\Support\Arr::get($formConfig, "id", "paymentpass_$service") }}').on('submit', function(formEvent){
+        $('#{{ \Illuminate\Support\Arr::get($formConfig, "id", "paymentpass_$serviceId") }}').on('submit', function(formEvent){
             //stops submit
             event.preventDefault();
             //gets form content
@@ -146,10 +150,9 @@
             });
             @endif
         });
-    };
+    }
 
-    function todoCargado(){
-        console.log("todo cargado");
+    function todoCargadoPara{{ $serviceId }}(){
         @foreach (\Illuminate\Support\Arr::get($formConfig, "pre_functions", []) as $pre_function => $params)
         {{ $pre_function }}(
             @if (is_array($params))
@@ -167,22 +170,25 @@
             @endif
         );
         @endforeach
+        console.log("todo cargado para {{ $serviceId }}");
     }
 
     @if (count(\Illuminate\Support\Arr::get($formConfig, "include_scripts", [])) > 0)
     @foreach ($formConfig["include_scripts"] as $include_script)
     @if (!$loop->first)
-    function cargarScript{{ $loop->index }}(){
+    function cargarScript{{ $loop->index }}Para{{ $serviceId }}(){
         var pathScript = '{{ $include_script }}';
         scriptLoader(pathScript,false,"");
         @if (!$loop->last)
-        scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"cargarScript{{ $loop->iteration }}();");
+        scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"cargarScript{{ $loop->iteration }}Para{{ $serviceId }}();");
         @else
-        scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"todoCargado();");
+        scriptLoaderCreator(pathScript.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_'),"todoCargadoPara{{ $serviceId }}();");
         @endif
     }
     @endif
     @endforeach
-    function scriptLoaderCreator(callbackName, functionBody){if(!(callbackName in callbacksFunctions)){callbacksFunctions[callbackName] = [];}callbacksFunctions[callbackName].push(new Function(functionBody));}function scriptLoaderRunner(callbackName){if(callbackName in callbacksFunctions){for (var i = 0; i < callbacksFunctions[callbackName].length; i++){callbacksFunctions[callbackName][i]();}}}function scriptLoader(path, diferir, inner=''){let scripts = Array .from(document.querySelectorAll('script')).map(scr => scr.src);var callbackName = inner;if (inner=='' && path != ''){callbackName = path.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_');}if (!scripts.includes(path) || path == ''){var tag = document.createElement('script');tag.type = 'text/javascript';if (callbackName!= ''){if(tag.readyState) {tag.onreadystatechange = function() {if ( tag.readyState === 'loaded' || tag.readyState === 'complete' ) {tag.onreadystatechange = null;scriptLoaderRunner(callbackName);}};}else{tag.onload = function() {scriptLoaderRunner(callbackName);};}}if (path != ''){tag.src = path;}if (diferir){var attd = document.createAttribute('defer');tag.setAttributeNode(attd);}if (inner != ''){var innerBlock = document.getElementById(inner);if (typeof innerBlock !== 'undefined' && innerBlock !== null){tag.innerHTML = innerBlock.innerHTML;}}document.getElementsByTagName('body')[document.getElementsByTagName('body').length-1].appendChild(tag);}else{if (callbackName!= ''){if(callbackName in window){window[callbackName]();}}}}
+    if (typeof window['scriptLoaderCreator'] !== 'function') {
+        function scriptLoaderCreator(callbackName, functionBody){if(!(callbackName in callbacksFunctions)){callbacksFunctions[callbackName] = [];}callbacksFunctions[callbackName].push(new Function(functionBody));}function scriptLoaderRunner(callbackName){if(callbackName in callbacksFunctions){for (var i = 0; i < callbacksFunctions[callbackName].length; i++){callbacksFunctions[callbackName][i]();}}}function scriptLoader(path, diferir, inner=''){let scripts = Array .from(document.querySelectorAll('script')).map(scr => scr.src);var callbackName = inner;if (inner=='' && path != ''){callbackName = path.split('/').pop().split('#')[0].split('?')[0].replaceAll('.','_');}if (!scripts.includes(path) || path == ''){var tag = document.createElement('script');tag.type = 'text/javascript';if (callbackName!= ''){if(tag.readyState) {tag.onreadystatechange = function() {if ( tag.readyState === 'loaded' || tag.readyState === 'complete' ) {tag.onreadystatechange = null;scriptLoaderRunner(callbackName);}};}else{tag.onload = function() {scriptLoaderRunner(callbackName);};}}if (path != ''){tag.src = path;}if (diferir){var attd = document.createAttribute('defer');tag.setAttributeNode(attd);}if (inner != ''){var innerBlock = document.getElementById(inner);if (typeof innerBlock !== 'undefined' && innerBlock !== null){tag.innerHTML = innerBlock.innerHTML;}}document.getElementsByTagName('body')[document.getElementsByTagName('body').length-1].appendChild(tag);}else{if (callbackName!= ''){if(callbackName in window){window[callbackName]();}}}}
+    }
     @endif
 </script>
