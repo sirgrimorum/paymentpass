@@ -444,6 +444,9 @@ class PaymentPassHandler
                     } elseif (Arr::get($actionConfig, 'authentication.type', 'nada') == 'token' && Arr::has($actionConfig, 'authentication.token')) {
                         $httpRequest = $httpRequest->withToken(Arr::get($actionConfig, 'authentication.token', ''));
                     }
+                    if (Arr::get($actionConfig, 'asForm', false) || Arr::get($actionConfig, 'headers.Content-Type', "") == "application/x-www-form-urlencoded"){
+                        $httpRequest = $httpRequest->asForm();
+                    }
                     if (in_array(Arr::get($actionConfig, 'method', ''), ['get', 'post', 'put', 'patch', 'delete']) && Arr::get($actionConfig, 'action', '') != '') {
                         $this->lanzarDump(["llamando $action de {$this->service}" => [
                             "actionConfig" => $actionConfig
