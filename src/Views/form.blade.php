@@ -87,7 +87,7 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
             @endif
             @if ($error_campo)
             <div class="invalid-feedback">
-                {{ $errors->get($columna)[0] }}
+                {{ $errors->get($extraId)[0] }}
             </div>
             @endif
             @if(isset($field["help"]))
