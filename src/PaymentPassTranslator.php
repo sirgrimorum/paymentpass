@@ -350,6 +350,10 @@ class PaymentPassTranslator
                                 $item = substr($item, 0, $left) . $piece;
                             }
                             $left = (stripos($item, $prefix));
+                            if ($item == $piece){
+                                //$item = $textPiece;
+                                $left = false;
+                            }
                         } else {
                             $item = $piece;
                             $left = false;
