@@ -350,7 +350,7 @@ class PaymentPassTranslator
                                 $item = substr($item, 0, $left) . $piece;
                             }
                             $left = (stripos($item, $prefix));
-                            if ($item == $piece){
+                            if ($item == $piece) {
                                 //$item = $textPiece;
                                 $left = false;
                             }
@@ -408,5 +408,48 @@ class PaymentPassTranslator
             }
             return $dato;
         }
+    }
+
+    /**
+     * Get the parameters for a function call in js
+     *
+     * @param mix $params The parameters to process
+     * @param bool $esPrimero Optional if is the first call (no {}) in the tree or no
+     * @return string The str to use in the js
+     */
+    public static function paramsForJs($params, $esPrimero = false)
+    {
+        if (is_array($params)) {
+            if (count($params) == 0) {
+                return "";
+            }
+            $return = !$esPrimero ? "{" : "";
+            $i = 0;
+            foreach ($params as $paramKey => $paramValue) {
+                if (!is_int($paramKey)) {
+                    $return .= "'{$paramKey}':";
+                }
+                if (is_array($paramValue)) {
+                    $return .= PaymentPassTranslator::paramsForJs($paramValue);
+                } else {
+                    if (Str::startsWith($paramValue, ['function', ' function'])){
+                        $return .= "{$paramValue}";
+                    }else{
+                        $return .= "'{$paramValue}'";
+                    }
+                }
+                if ($i < count($params) - 1) {
+                    $return .= ",";
+                }
+            }
+            $return .= !$esPrimero ? "}" : "";
+            return $return;
+        } elseif ($params != '' && $params != null) {
+            if (Str::startsWith($params, ['funtion', ' funciton'])){
+                return "{$params}";
+            }
+            return "'{$params}'";
+        }
+        return "";
     }
 }

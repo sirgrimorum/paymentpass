@@ -15,7 +15,7 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
     @foreach(\Illuminate\Support\Arr::get($formConfig, "fields", []) as $field)
     <?php
     $error_campo = false;
-        $claseError = 'is-valid';
+    $claseError = 'is-valid';
     ?>
     @if(\Illuminate\Support\Arr::get($field, "type", "") == 'script')
     <script
@@ -31,7 +31,7 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
         @endforeach
         >@if(\Illuminate\Support\Arr::get($field, "content", "") !== null){!! \Illuminate\Support\Arr::get($field, "content", "") !!}@endif
     </style>
-    @elseif(\Illuminate\Support\Arr::get($field, "type", "") == 'div')
+    @elseif(\Illuminate\Support\Arr::get($field, "type", "") == 'div' && \Illuminate\Support\Arr::get($field, "label", "") == "")
     <div
         @foreach(\Illuminate\Support\Arr::get($field, "attributes", []) as $attribute)
         {!! $attribute !!}
@@ -58,38 +58,43 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
             @endif
         </div>
         <div class='{{ \Illuminate\Support\Arr::get($field, "div_input_class", "col-xs-12 col-sm-8 col-md-10") }}'>
-            @if (\Illuminate\Support\Arr::get($field, "pre", "") != "" || \Illuminate\Support\Arr::get($field, "post", "") != "")
-            <div class="input-group {{ \Illuminate\Support\Arr::get($field, "div_input_group_class", "") }} {{ $claseError }}">
-                @endif
-                @if (\Illuminate\Support\Arr::get($field, "pre", "") != "")
-                @if (is_array($field["pre"]))
-                <div class="input-group-prepend"><div class="input-group-text" id="{{ array_keys($field["pre"][0]) }}">{!! $field["pre"][array_keys($field["pre"][0])] !!}</div></div>
-                @else
-                <div class="input-group-prepend"><div class="input-group-text">{!! $field["pre"] !!}</div></div>
-                @endif
-                @endif
-                <input
-                    {{-- class="{{ $claseError }}" --}}
-                    type='{{ \Illuminate\Support\Arr::get($field, "type", "text") }}'
-                    @foreach(\Illuminate\Support\Arr::get($field, "attributes", []) as $attribute)
-                    {!! $attribute !!}
-                    @endforeach
-                />
-                @if (\Illuminate\Support\Arr::get($field, "post", "") != "")
-                @if (is_array($field["post"]))
-                <div class="input-group-append"><div class="input-group-text" id="{{ array_keys($field["post"])[0] }}">{!! $field["post"][array_keys($field["post"])[0]] !!}</div></div>
-                @else
-                <div class="input-group-append"><div class="input-group-text">{!! $field["post"] !!}</div></div>
-                @endif
-                @endif
+            @if(\Illuminate\Support\Arr::get($field, "type", "") == 'div')
+            <div
+                @foreach(\Illuminate\Support\Arr::get($field, "attributes", []) as $attribute)
+                {!! $attribute !!}
+                @endforeach
+                >@if(\Illuminate\Support\Arr::get($field, "content", "") !== null){!! \Illuminate\Support\Arr::get($field, "content", "") !!}@endif</div>
+            @else
                 @if (\Illuminate\Support\Arr::get($field, "pre", "") != "" || \Illuminate\Support\Arr::get($field, "post", "") != "")
-            </div>
+                <div class="input-group {{ \Illuminate\Support\Arr::get($field, "div_input_group_class", "") }} {{ $claseError }}">
+                    @endif
+                    @if (\Illuminate\Support\Arr::get($field, "pre", "") != "")
+                    @if (is_array($field["pre"]))
+                    <div class="input-group-prepend"><div class="input-group-text" id="{{ array_keys($field["pre"][0]) }}">{!! $field["pre"][array_keys($field["pre"][0])] !!}</div></div>
+                    @else
+                    <div class="input-group-prepend"><div class="input-group-text">{!! $field["pre"] !!}</div></div>
+                    @endif
+                    @endif
+                    <input
+                        {{-- class="{{ $claseError }}" --}}
+                        type='{{ \Illuminate\Support\Arr::get($field, "type", "text") }}'
+                        @foreach(\Illuminate\Support\Arr::get($field, "attributes", []) as $attribute)
+                        {!! $attribute !!}
+                        @endforeach
+                    />
+                    @if (\Illuminate\Support\Arr::get($field, "post", "") != "")
+                    @if (is_array($field["post"]))
+                    <div class="input-group-append"><div class="input-group-text" id="{{ array_keys($field["post"])[0] }}">{!! $field["post"][array_keys($field["post"])[0]] !!}</div></div>
+                    @else
+                    <div class="input-group-append"><div class="input-group-text">{!! $field["post"] !!}</div></div>
+                    @endif
+                    @endif
+                    @if (\Illuminate\Support\Arr::get($field, "pre", "") != "" || \Illuminate\Support\Arr::get($field, "post", "") != "")
+                </div>
+                @endif
             @endif
-            @if ($error_campo)
             <div class="invalid-feedback">
-                {{ $errors->get($extraId)[0] }}
             </div>
-            @endif
             @if(isset($field["help"]))
             <small class="form-text text-muted mt-0">
                 {!! $field["help"] !!}
@@ -99,10 +104,10 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
     </div>
     @endif
     @endforeach
-    <div class='{{ \Illuminate\Support\Arr::get($field, "div_class", "form-group row") }}'>
-        <div class='{{ \Illuminate\Support\Arr::get($field, "button_div_class", "col-xs-offset-0 col-sm-offset-4 col-md-offset-2 col-xs-12 col-sm-8 col-md-10") }}'>
-            <button class='{{ \Illuminate\Support\Arr::get($field, "button_class", "btn btn-primary") }}' type="submit" form='{{ \Illuminate\Support\Arr::get($formConfig, "id", "form_paymentpass_$serviceId") }}'>
-                {{ \Illuminate\Support\Arr::get($field, "button_label", "Guardar") }}
+    <div class='{{ \Illuminate\Support\Arr::get($formConfig, "div_class", "form-group row") }}'>
+        <div class='{{ \Illuminate\Support\Arr::get($formConfig, "button_div_class", "col-xs-offset-0 col-sm-offset-4 col-md-offset-2 col-xs-12 col-sm-8 col-md-10") }}'>
+            <button class='{{ \Illuminate\Support\Arr::get($formConfig, "button_class", "btn btn-primary") }}' type="submit" form='{{ \Illuminate\Support\Arr::get($formConfig, "id", "form_paymentpass_$serviceId") }}'>
+                {{ \Illuminate\Support\Arr::get($formConfig, "button_label", "Guardar") }}
             </button>
         </div>
     </div>
@@ -155,22 +160,9 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
     function todoCargadoPara{{ $serviceId }}(){
         @foreach (\Illuminate\Support\Arr::get($formConfig, "pre_functions", []) as $pre_function => $params)
         {{ $pre_function }}(
-            @if (is_array($params))
-            {
-                @foreach($params as $paramKey => $paramValue)
-                @if (is_int($paramKey))
-                '{{ $paramValue }}'{{ (!$loop->last) ? ",":"" }}
-                @else
-                '{{ $paramKey }}':'$paramValue'{{ (!$loop->last) ? ",":"" }}
-                @endif
-                @endforeach
-            }
-            @elseif($params != '' && $params != null)
-            '{{ $params }}'
-            @endif
+            {!! \Sirgrimorum\PaymentPass\PaymentPassTranslator::paramsForJs($params, true) !!}
         );
         @endforeach
-        console.log("todo cargado para {{ $serviceId }}");
     }
 
     @if (count(\Illuminate\Support\Arr::get($formConfig, "include_scripts", [])) > 0)
