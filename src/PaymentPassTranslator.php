@@ -330,6 +330,15 @@ class PaymentPassTranslator
                                             $piece = "";
                                         }
                                         break;
+                                    case "boolean":
+                                        if (count($datosParameters) == 1) {
+                                            $piece = PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config) == true;
+                                        } elseif (count($datosParameters) == 2) {
+                                            $piece = PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config) == PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                        } else {
+                                            $piece = false;
+                                        }
+                                        break;
                                     default:
                                         $piece = $textPiece;
                                         break;
@@ -432,9 +441,9 @@ class PaymentPassTranslator
                 if (is_array($paramValue)) {
                     $return .= PaymentPassTranslator::paramsForJs($paramValue);
                 } else {
-                    if (Str::startsWith($paramValue, ['function', ' function'])){
+                    if (Str::startsWith($paramValue, ['function', ' function'])) {
                         $return .= "{$paramValue}";
-                    }else{
+                    } else {
                         $return .= "'{$paramValue}'";
                     }
                 }
@@ -445,7 +454,7 @@ class PaymentPassTranslator
             $return .= !$esPrimero ? "}" : "";
             return $return;
         } elseif ($params != '' && $params != null) {
-            if (Str::startsWith($params, ['funtion', ' funciton'])){
+            if (Str::startsWith($params, ['funtion', ' funciton'])) {
                 return "{$params}";
             }
             return "'{$params}'";
