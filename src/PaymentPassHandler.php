@@ -444,7 +444,7 @@ class PaymentPassHandler
                     } elseif (Arr::get($actionConfig, 'authentication.type', 'nada') == 'token' && Arr::has($actionConfig, 'authentication.token')) {
                         $httpRequest = $httpRequest->withToken(Arr::get($actionConfig, 'authentication.token', ''));
                     }
-                    if (Arr::get($actionConfig, 'asForm', false) || Arr::get($actionConfig, 'headers.Content-Type', "") == "application/x-www-form-urlencoded"){
+                    if (Arr::get($actionConfig, 'asForm', false) || Arr::get($actionConfig, 'headers.Content-Type', "") == "application/x-www-form-urlencoded") {
                         $httpRequest = $httpRequest->asForm();
                     }
                     if (in_array(Arr::get($actionConfig, 'method', ''), ['get', 'post', 'put', 'patch', 'delete']) && Arr::get($actionConfig, 'action', '') != '') {
@@ -547,34 +547,11 @@ class PaymentPassHandler
                 $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
                 $reRevisar = true;
             } elseif (is_array($field_name)) {
-                foreach ($field_name as $keyField => $valueField) {
-                    if ($valueField == "__all__" && is_string($keyField)) {
-                        data_set($actionConfig, $preFieldsName . $keyField, $result);
-                        $reRevisar = true;
-                    } elseif (($valueField == 'true' || $valueField == 'false') && is_string($keyField)) {
-                        data_set($actionConfig, $preFieldsName . $keyField, $valueField == 'true');
-                        $reRevisar = true;
-                    } elseif (is_string($keyField) && is_string($valueField) && $valueField !== null) {
-                        if (is_array($result) && $result !== null) {
-                            data_set($actionConfig, $preFieldsName . $keyField, Arr::get($result, $valueField, $valueField));
-                            $reRevisar = true;
-                        } elseif (is_object($result) && $result !== null) {
-                            if (property_exists($result, $valueField)) {
-                                if (is_callable([$result, $valueField])) {
-                                    data_set($actionConfig, $preFieldsName . $keyField, $result->{$valueField}());
-                                } else {
-                                    data_set($actionConfig, $preFieldsName . $keyField, $result->{$valueField});
-                                }
-                                $reRevisar = true;
-                            }
-                        } else {
-                            data_set($actionConfig, $preFieldsName . $keyField, $result);
-                            $reRevisar = true;
-                        }
-                    } elseif (count($field_name) == 1 && is_string($valueField)) {
-                        data_set($actionConfig, $preFieldsName . $valueField, $result);
-                        $reRevisar = true;
-                    }
+                $resultado = $this->subMapear($field_name, $result, $reRevisar);
+                if ($preFieldsName != ""){
+                    data_set($actionConfig, $preFieldsName, $resultado);
+                }elseif (count($actionConfig) == 0) {
+                    $actionConfig = $resultado;
                 }
             }
         } elseif (count($actionConfig) == 0 && $result != null) {
@@ -583,6 +560,45 @@ class PaymentPassHandler
         if ($reRevisar) {
             $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
         }
+    }
+
+    private function subMapear($field_name, $result, &$reRevisar)
+    {
+        if (is_array($field_name) && count($field_name) > 0) {
+            $procesado = [];
+            foreach ($field_name as $keyField => $valueField) {
+                if (is_int($keyField) && is_string($valueField)) {
+                    data_set($procesado, $valueField, $result);
+                    $reRevisar = true;
+                } else {
+                    data_set($procesado, $keyField, $this->subMapear($valueField, $result, $reRevisar));
+                }
+            }
+            return $procesado;
+        } elseif (is_string($field_name)) {
+            $reRevisar = true;
+            if ($field_name == "__all__") {
+                return $result;
+            } elseif (($field_name == 'true' || $field_name == 'false')) {
+                return $field_name == 'true';
+            } elseif ($field_name !== null) {
+                if (is_array($result) && $result !== null) {
+                    return Arr::get($result, $field_name, $field_name);
+                } elseif (is_object($result) && $result !== null) {
+                    if (property_exists($result, $field_name)) {
+                        if (is_callable([$result, $field_name])) {
+                            return $result->{$field_name}();
+                        } else {
+                            return $result->{$field_name};
+                        }
+                    }
+                } else {
+                    return $result;
+                }
+            }
+        }
+        $reRevisar = false;
+        return $field_name;
     }
 
     /**
