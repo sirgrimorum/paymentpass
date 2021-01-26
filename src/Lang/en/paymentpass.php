@@ -3,6 +3,7 @@
 return [
     'labels' => [
         'close' => 'Close',
+        'select' => 'Seleccione...',
     ],
     'messages'=>[
         'not_found' => 'No transaction found with the reference code <strong>:referenceCode</strong>. Please contact the administrator.',
