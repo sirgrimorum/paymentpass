@@ -75,6 +75,23 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
                     <div class="input-group-prepend"><div class="input-group-text">{!! $field["pre"] !!}</div></div>
                     @endif
                     @endif
+                    @if (\Illuminate\Support\Arr::get($field, "type", "") == 'select')
+                    <select
+                        {{-- class="{{ $claseError }}" --}}
+                        @foreach(\Illuminate\Support\Arr::get($field, "attributes", []) as $attribute)
+                        {!! $attribute !!}
+                        @endforeach
+                    >
+                    <option value="">{{ trans('paymentpass::paymentpass.labels.select') }}</option>
+                    @foreach(\Illuminate\Support\Arr::get($field, "options", []) as $valueOption => $option)
+                        @if (is_int($valueOption))
+                            <option value="{{ $option }}">{{ ucfirst($option) }}</option>
+                        @else
+                            <option value="{{ $valueOption }}">{{ $option }}</option>
+                        @endif
+                    @endforeach
+                    </select>
+                    @else
                     <input
                         {{-- class="{{ $claseError }}" --}}
                         type='{{ \Illuminate\Support\Arr::get($field, "type", "text") }}'
@@ -82,6 +99,7 @@ $serviceId = ucfirst($service) . "_" . \Illuminate\Support\Str::random(5);
                         {!! $attribute !!}
                         @endforeach
                     />
+                    @endif
                     @if (\Illuminate\Support\Arr::get($field, "post", "") != "")
                     @if (is_array($field["post"]))
                     <div class="input-group-append"><div class="input-group-text" id="{{ array_keys($field["post"])[0] }}">{!! $field["post"][array_keys($field["post"])[0]] !!}</div></div>
