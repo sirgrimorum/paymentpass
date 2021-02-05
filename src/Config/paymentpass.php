@@ -53,13 +53,13 @@ return [
             'sdk_call'=>[ // get the redirect from the sdk for the 'sdk' type
                 'type' => 'attribute', // type of the call, options are: 'static' (nedds a class name), 'function' (calls a function to the current 'sdk_call.class' object with 'parameters' parameters),'attribute' (calls an attribute of the current 'sdk_call.class' object)
                 'class' => '\MercadoPago\Preference',
-                'create_parameters' => ['__service_parameters_all__'], // parameters to pass to de create, '__service_parameters_all__' pass the proccesed parameters array including the responses urls
+                'create_parameters' => ['__service_parameters_all__'], // parameters to pass to de create, '__service_parameters_all__' pass the proccesed parameters array including the webhooks urls
                 'pre_functions' =>[ //functions to call, in order, previus to the redirec function. 'name' is the name of the function, for non 'static' types
                     'save'=>'', // leave parameter empty for no parameters passed
                     'name'=>'parameter', // leave parameter empty for no parameters passed
                     'name'=>'__service_parameters__parameters.currency', // parameters to pass to the function, could be an array, use '__servic_parameters__fild_name' for fields in the proccesed service parameters array or '__service_parameters_all__' to pass the array
                     'name'=>[
-                        '__service_parameters__client_id', // parameters to pass to the function, use '__servic_parameters__fild_name' for fields in the proccesed service parameters array 
+                        '__service_parameters__client_id', // parameters to pass to the function, use '__servic_parameters__fild_name' for fields in the proccesed service parameters array
                         ],
                 ],
                 'name' => 'init_point', // name of the function/attribute to call
@@ -78,7 +78,7 @@ return [
                         'category_id' => '__data__product_category',
                     ]
                 ],
-                'items' => '__data__items', // other option 
+                'items' => '__data__items', // other option
                 'payer' => [
                     'name' => '__data__name',
                     'surname' => '__data__surname',
@@ -105,7 +105,7 @@ return [
                 'encryption' => 'md5', // could be md5, sha1 or sha256
             ],
             'signature' => [ // for security if it applies for the service
-                'active' => false, // if it shoud be calculated 
+                'active' => false, // if it shoud be calculated
                 'send' => false, // if it shoud be sent
                 'field_name' => 'signature',
                 'separator' => '~',
@@ -118,7 +118,7 @@ return [
                 ],
                 'encryption' => 'md5', // could be md5, sha1 or sha256
             ],
-            'responses' => [ // type of responses to handle
+            'webhooks' => [ // type of webhooks to handle
                 'notification' => [ // how to map the PaymentPass model with the post or get data for this specifc response call
                     'url' => "", // url of the callback to this response, if blank or not present it will be route("paymentpass::response",["service"=>"this service","responseType"=>"this response type"], use: __route__ will evaluate route() and __url__ will evaluate url(), use , to separate parameters and json notation for array parameters
                     'url_field_name' => "notification_url", //name of the field name for the url to send in parameters
@@ -225,7 +225,7 @@ return [
                 'success' => [
                     "approved" => "apr", // the state field in the bd is 3 varchar long, so the data must be truncated, the key is the value returned and the value is the one saved to the bd
                     "authorized" => "aut"
-                ], 
+                ],
                 'failure' => [
                     "rejected" => "rej",
                     "cancelled" => "can",
@@ -240,13 +240,13 @@ return [
             ],
             'callbacks' => [ //to be called in the response and/or confirmation calls from the payment service depending on the state_code results
                 'success' => function($paymentpass){
-    
+
                 },
                 'failure' => function($paymentpass){ //if is an internal error, $paymentpass will be a string with the error
-                    
+
                 },
                 'other' => function($paymentpass){
-                    
+
                 }
             ]
         ],
@@ -278,7 +278,7 @@ return [
             ],
             'referenceCode' => [ //referenceCode of the transaction intent
                 'send' => true, // if it should be send to the payment service
-                'field_name' => 'referenceCode', 
+                'field_name' => 'referenceCode',
                 'separator' => '~',
                 'fields' => [ // fields in order that conform the code
                     '__data__cedula',
@@ -288,7 +288,7 @@ return [
                 'encryption' => 'md5', // could be md5, sha1 or sha256
             ],
             'signature' => [ // for security if it applies for the service
-                'active' => true, // if it shoud be calculated 
+                'active' => true, // if it shoud be calculated
                 'send' => true, // if it shoud be sent
                 'field_name' => 'signature',
                 'separator' => '~',
@@ -301,7 +301,7 @@ return [
                 ],
                 'encryption' => 'md5', // could be md5, sha1 or sha256
             ],
-            'responses' => [ // type of responses to handle
+            'webhooks' => [ // type of webhooks to handle
                 'confirmation' => [ // how to map the PaymentPass model with the post or get data for this specifc response call
                     'url' => "__route__paymentpass::response,{'service':'payu','responseType':'confirmation'}", // url of the callback to this response, if blank or not present it will be route("paymentpass::response",["service"=>"this service","responseType"=>"this response type"], use: __route__ will evaluate route() and __url__ will evaluate url(), use , to separate parameters and json notation for array parameters
                     'url_field_name' => "confirmationUrl", //name of the field name for the url to send in parameters
@@ -331,13 +331,13 @@ return [
             ],
             'callbacks' => [ //to be called in the response and/or confirmation calls from the payment service depending on the state_code results
                 'success' => function($paymentpass){
-    
+
                 },
                 'failure' => function($paymentpass){ //if is an internal error, $paymentpass will be a string with the error
-                    
+
                 },
                 'other' => function($paymentpass){
-                    
+
                 }
             ]
         ]
