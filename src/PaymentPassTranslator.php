@@ -2,6 +2,7 @@
 
 namespace Sirgrimorum\PaymentPass;
 
+use DateTime;
 use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
@@ -70,6 +71,8 @@ class PaymentPassTranslator
         "session_id",
         "device_session_id",
         "ip_address",
+        'datetime_utc',
+        'datetime',
         "user_agent",
         "config_action",
         "pre_action",
@@ -149,29 +152,7 @@ class PaymentPassTranslator
                 if (is_array($item) && count($item) > 0) {
                     $result[$key] = $this->translate($item);
                 } elseif (is_string($item)) {
-                    $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
-
-                    $item = $this->transString($item, "__route__", "route");
-                    $item = $this->transString($item, "__url__", "url");
-                    if (function_exists('trans_article')) {
-                        $item = $this->transString($item, "__trans_article__", "trans_article");
-                    }
-                    if (!$request) {
-                        $item = $this->transString($item, "__data__", "data", $data);
-                    } else {
-                        $item = $this->transString($item, "__request__", "data", $data);
-                    }
-                    $item = $this->transString($item, "__trans__", "trans");
-                    $item = $this->transString($item, "__asset__", "asset");
-                    $item = $this->transString($item, "__session_id__", "session_id");
-                    $item = $this->transString($item, "__device_session_id__", "device_session_id");
-                    $item = $this->transString($item, "__ip_address__", "ip_address");
-                    $item = $this->transString($item, "__user_agent__", "user_agent");
-                    $item = $this->transString($item, "__config_action__", "config_action", $configComplete, $result);
-                    $item = $this->transString($item, "__pre_action__", "pre_action", Arr::get($configComplete, "datosPre", []), $result);
-                    $item = $this->transString($item, "__config_paymentpass__", "config_paymentpass", $configComplete, $result);
-                    $item = $this->transString($item, "__auto__", "auto", $data, $result);
-                    $item = $this->transString($item, "__auto__", "auto", $data, $result);
+                    $item = $this->transSingleString($item, $data, $configComplete, $result, $request);
                     $result[$key] = $item;
                 } else {
                     $result[$key] = $item;
@@ -192,17 +173,40 @@ class PaymentPassTranslator
      * For array, use json notation inside comas
      *
      * @param string $item The string to operate
-     * @param string $prefix The prefix for the function
-     * @param string $function The name of the function to evaluate
      * @param array $data Optional, The data with optional parameters
-     * @param array $config Optional, The complete config so far
-     * @param string $close Optional, the closing string for the prefix, default is '__'
+     * @param array $configComplete The complete config so far
+     * @param array $result Optional, the result of the translate so far
+     * @param boolean $request Optional, if the data is request data or not, if different from false, "__request__" will operate with "__data__"
      * @return string The string with the results of the evaluations
      */
-    private function transString($item, $prefix, $function, $data = [], $config = [], $close = "__")
-    {
-        if (in_array($function, $this->functionsToProcess)) {
-            return PaymentPassTranslator::translateString($item, $prefix, $function, $data, $config, $close);
+    public function transSingleString($item, $data, $configComplete, $result = [], $request = false){
+
+        $dataParaFunctions = [
+            "data" => $data,
+            'datetime_utc' => $data,
+            'datetime' => $data,
+            "config_action" => $configComplete,
+            "pre_action" => Arr::get($configComplete, "datosPre", []),
+            "config_paymentpass" => $configComplete,
+            "auto" => $data,
+        ];
+        $configParaFunctions = [
+            "config_action" => $result,
+            "pre_action" => $result,
+            "config_paymentpass" => $result,
+            "auto" => $result,
+        ];
+        $functionsToProcess = $this->functionsToProcess;
+        if (in_array("auto", $functionsToProcess)){
+            $functionsToProcess[] = "auto";
+        }
+        $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
+        foreach($this->functionsToProcess as $function){
+            if ($request !== false && $function == "data") {
+                $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []));
+            } else {
+                $item = PaymentPassTranslator::translateString($item, "__{$function}__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []));
+            }
         }
         return $item;
     }
@@ -257,6 +261,12 @@ class PaymentPassTranslator
                                 $piece = PaymentPassTranslator::getValorDesde($textPiece, $data, $config);
                             } elseif ($function == 'ip_address') {
                                 $piece = $_SERVER['REMOTE_ADDR'];
+                            } elseif ($function == 'datetime_utc') {
+                                $currentDateTime = new DateTime('UTC');
+                                $piece = $currentDateTime->format($textPiece);
+                            } elseif ($function == 'datetime') {
+                                $currentDateTime = new DateTime();
+                                $piece = $currentDateTime->format($textPiece);
                             } elseif ($function == 'user_agent') {
                                 $piece = $_SERVER['HTTP_USER_AGENT'];
                             } elseif ($function == 'session_id') {
