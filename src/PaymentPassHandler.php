@@ -2,7 +2,9 @@
 
 namespace Sirgrimorum\PaymentPass;
 
+use DateTime;
 use Exception;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Hash;
@@ -14,12 +16,13 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Http;
 use ReflectionClass;
 use ReflectionMethod;
+use Sirgrimorum\PaymentPass\Jobs\RunCallableAfterPayment;
 
 class PaymentPassHandler
 {
 
     protected $service;
-    protected $config;
+    public $config;
     protected $payment = null;
 
     function __construct($service = "")
@@ -95,6 +98,32 @@ class PaymentPassHandler
     }
 
     /**
+     * Get the status and status code of a given sendedStatus form the config array
+     *
+     * @param array $curConfig Current service config array
+     * @param string $sendedState The status received in the webhook
+     * @param string $default Optional The $state in case the $sendedState is not recogniced, default is "failure"
+     * @param string $config_camp Optional The camp to look for codes in curConfig array, default for states is 'state_codes'
+     * @return array [$state|$default, $stateCode|$sendedState]
+     */
+    private function getResponseStatus($curConfig, $sendedState, $default = "failure", $config_camp = 'service.state_codes')
+    {
+        foreach (Arr::get($curConfig, $config_camp ?? 'service.state_codes', []) as $state => $subState) {
+            if (is_array($subState)) {
+                if (Arr::has($subState, $sendedState)) {
+                    $stateCode = Arr::get($subState, $sendedState, "");
+                    return [$state, $stateCode];
+                } else if (in_array($sendedState, $subState)) {
+                    return [$state, $sendedState . "1"];
+                }
+            } elseif ($subState == $sendedState) {
+                return [$state, $sendedState . "0"];
+            }
+        }
+        return [$default, $sendedState];
+    }
+
+    /**
      * Handle a response from the payment source. update the payment and show a view with the result.
      *
      * @param string $responseType Name of the response type, options are 'response' and 'confirmation'
@@ -118,8 +147,8 @@ class PaymentPassHandler
             $responseType = strtolower($responseType);
         }
         $curConfig = $this->config;
-        $curConfig = (new PaymentPassTranslator([], $curConfig, $this->config, false))->translate();
-        if (!Arr::has($curConfig, "service.responses." . $responseType)) {
+        $curConfig = (new PaymentPassTranslator([], $curConfig, $this->config, true))->translate();
+        if (!Arr::has($curConfig, "service.webhooks." . $responseType)) {
             $responseType = "error";
         }
         if ($responseType == "error") {
@@ -131,7 +160,7 @@ class PaymentPassHandler
             if ($request->isMethod('get')) {
                 Session::flash(Arr::get($curConfig, "error_messages_key"), $error);
             } else {
-                return $error;
+                return response()->json($error, 400);
             }
             return response()->view(Arr::get($curConfig, "result_template", "paymentpass.result"), [
                 'user' => $request->user(),
@@ -141,22 +170,28 @@ class PaymentPassHandler
             ], 200);
         } else {
             $datos = $request->all();
-            $configResponse = Arr::get($curConfig, "service.responses.$responseType");
-            foreach (Arr::get($configResponse, "pre_actions", []) as $reference => $class_datos) {
-                if ($this->conditionsFunction(Arr::get($class_datos, "if", []), $curConfig, $datos)) {
-                    if (Arr::get($class_datos, "field_name", "") != "") {
-                        $auxDatos = $this->execAction($reference, $class_datos, $curConfig, $datos, null, false);
-                        if (is_array($auxDatos) || is_object($auxDatos)) {
-                            $auxDatos = json_decode(json_encode($auxDatos), true);
-                            if (Arr::has($auxDatos, "body")) {
-                                $auxDatos = Arr::get($auxDatos, "body");
-                            }
-                        }
-                        $this->mapearRespuesta($curConfig, $datos, $auxDatos, $datos, $class_datos, "");
+            $configResponse = Arr::get($curConfig, "service.webhooks.$responseType");
+            if (!$this->conditionsFunction(Arr::get($configResponse, "if", []), $curConfig, $datos)) {
+                return response()->json('no_aplica', Arr::get($configResponse, "final_response_code", 200));
+            }
+            $hacerTranslateConPre = false;
+            foreach (Arr::get($configResponse, "pre_actions", []) as $refName => $preActionConfig) {
+                if (is_int($refName) && is_string($preActionConfig)) {
+                    if (Arr::has($curConfig, "service.actions.$preActionConfig")) {
+                        $resultadoPre = $this->execAction($preActionConfig, Arr::get($curConfig, "service.actions.$preActionConfig", null), $curConfig, $datos, null, false);
+                        $configResponse['datosPre'][$preActionConfig] = $resultadoPre ?? "devolvio null";
+                        $hacerTranslateConPre = !$hacerTranslateConPre ? ($resultadoPre !== null) : true;
                     } else {
-                        $this->execAction($reference, $class_datos, $curConfig, $datos, null, false);
+                        $configResponse['datosPre'][$preActionConfig] = null;
                     }
+                } elseif (is_string($refName) && is_array($preActionConfig)) {
+                    $resultadoPre = $this->execAction($refName, $preActionConfig, $curConfig, $datos, null, false);
+                    $configResponse['datosPre'][$refName] = $resultadoPre;
+                    $hacerTranslateConPre = !$hacerTranslateConPre ? ($resultadoPre !== null) : true;
                 }
+            }
+            if ($hacerTranslateConPre) {
+                $configResponse = (new PaymentPassTranslator($datos, $configResponse, $configResponse))->just(['pre_action'])->translate();
             }
             $referenceCode = $this->getResponseParameter(Arr::get($configResponse, "referenceCode", ""), $curConfig, $datos);
             $payment = $this->getByReferencia($referenceCode);
@@ -168,7 +203,7 @@ class PaymentPassHandler
             } else {
                 $noexiste = false;
             }
-            if ($payment || (!Arr::get($curConfig, "production", false))) {
+            if ($payment || (!Arr::get($configResponse, "fail_not_found", true)) || (!Arr::get($curConfig, "production", false))) {
                 if ($noexiste) {
                     $this->payment = new PaymentPass();
                 } else {
@@ -180,20 +215,22 @@ class PaymentPassHandler
                     $datos['_responseType'] = $responseType;
                     $datos['_service'] = $this->service;
                 }
+                $state = "";
                 if (Arr::get($configResponse, "state", "") != "_notthistime") {
                     $state = $this->getResponseParameter(Arr::get($configResponse, "state", ""), $curConfig, $datos);
-                    $stateAux = $state;
-                    if (Arr::has(Arr::get($curConfig, "service.state_codes.failure"), $stateAux)) {
-                        $stateAux = Arr::get($curConfig, "service.state_codes.failure." . $stateAux);
-                    } elseif (Arr::has(Arr::get($curConfig, "service.state_codes.pending"), $stateAux)) {
-                        $stateAux = Arr::get($curConfig, "service.state_codes.pending." . $stateAux);
-                    } elseif (Arr::has(Arr::get($curConfig, "service.state_codes.success"), $stateAux)) {
-                        $stateAux = Arr::get($curConfig, "service.state_codes.success." . $stateAux);
-                    }
+                    [$state, $stateAux] = $this->getResponseStatus($curConfig, $state);
                     if (strlen($stateAux) > 3) {
                         $stateAux = substr($stateAux, 0, 3);
                     }
                     $this->payment->state = $stateAux;
+                }
+                if (Arr::get($configResponse, "type", "") != "_notthistime") {
+                    $typePayment = $this->getResponseParameter(Arr::get($configResponse, "type", ""), $curConfig, $datos);
+                    [$typePayment, $typeAux] = $this->getResponseStatus($curConfig, $typePayment, $responseType, 'service.type_codes');
+                    if (strlen($typePayment) > 3) {
+                        $typePayment = substr($typePayment, 0, 3);
+                    }
+                    $this->payment->type = $typePayment;
                 }
                 if (Arr::get($configResponse, "payment_method", "_notthistime") != "_notthistime") {
                     $this->payment->payment_method = $this->getResponseParameter(Arr::get($configResponse, "payment_method", ""), $curConfig, $datos);
@@ -208,10 +245,11 @@ class PaymentPassHandler
                     $this->payment->payment_state = $this->getResponseParameter(Arr::get($configResponse, "payment_state", ""), $curConfig, $datos);
                 }
                 if (Arr::get($configResponse, "save_data", "__all__") == "__all__" || !is_array(Arr::get($configResponse, "save_data"))) {
-                    $save_data = json_encode($datos);
+                    $save_data = $datos;
                 } else {
-                    $save_data = json_encode(Arr::only($datos, Arr::get($configResponse, "save_data")));
+                    $save_data = Arr::only($datos, Arr::get($configResponse, "save_data"));
                 }
+                $save_data = json_encode(array_merge($save_data, ['datosPre' => Arr::get($configResponse, "datosPre", [])]));
                 if (!$request->isMethod('get')) {
                     $this->payment->response_date = now();
                     if (Arr::get($configResponse, "save_data", "_notthistime") != "_notthistime") {
@@ -238,23 +276,22 @@ class PaymentPassHandler
                 if (!$noexiste) {
                     $this->payment->save();
                 } else {
-                    if (Arr::get($curConfig, "saveAll", false)) {
+                    if (Arr::get($configResponse, "create_not_found", Arr::get($curConfig, "saveAll", false))) {
                         $this->payment->save();
                     }
                 }
                 $this->lanzarDump([
                     "after save" => ["datos" => $datos, "Payment" => $this->payment]
                 ]);
-
-                if (in_array($state, Arr::get($curConfig, "service.state_codes.failure")) || Arr::has(Arr::get($curConfig, "service.state_codes.failure"), $state)) {
-                    $callbackFunc = Arr::get($curConfig, "service.callbacks.failure", "");
-                } elseif (in_array($state, Arr::get($curConfig, "service.state_codes.success")) || Arr::has(Arr::get($curConfig, "service.state_codes.success"), $state)) {
-                    $callbackFunc = Arr::get($curConfig, "service.callbacks.success", "");
-                } else {
-                    $callbackFunc = Arr::get($curConfig, "service.callbacks.other", "");
-                }
-                if (is_callable($callbackFunc)) {
-                    call_user_func($callbackFunc, $this->payment);
+                if (Arr::get($configResponse, "state", "") != "_notthistime") {
+                    if (Arr::get($curConfig, "queue_callbacks", false)) {
+                        RunCallableAfterPayment::dispatch($state, $this->service, $this->payment);
+                    } else {
+                        $callbackFunc = Arr::get($curConfig, "service.callbacks.$state", Arr::get($curConfig, "service.callbacks.other", ""));
+                        if (is_callable($callbackFunc)) {
+                            call_user_func($callbackFunc, $this->payment);
+                        }
+                    }
                 }
                 if ($request->isMethod('get')) {
                     if (in_array($this->payment->state, Arr::get($curConfig, "service.state_codes.failure"))) {
@@ -263,13 +300,13 @@ class PaymentPassHandler
                         Session::flash(Arr::get($curConfig, "status_messages_key"), str_replace([":referenceCode"], [$this->payment->referenceCode], trans("paymentpass::services.{$this->service}.messages.{$this->payment->state}")));
                     }
                 } else {
-                    return response()->json($this->payment->payment_state, 201);
+                    return response()->json($this->payment->payment_state, Arr::get($configResponse, "final_response_code", 201));
                 }
             } else {
                 if ($request->isMethod('get')) {
                     Session::flash(Arr::get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$request->get(Arr::get($curConfig, "service.$responseType.referenceCode"))], trans("paymentpass::messages.not_found")));
                 } else {
-                    return response()->json('not_found', 200);
+                    return response()->json('not_found', Arr::get($configResponse, "fail_not_found_code", 200));
                 }
             }
             if ($request->isMethod('get')) {
@@ -278,9 +315,9 @@ class PaymentPassHandler
                     'request' => $request,
                     'paymentPass' => $this->payment,
                     'config' => $curConfig,
-                ], 200);
+                ], Arr::get($configResponse, "final_response_code", 201));
             } else {
-                return response()->json('not_found', 200);
+                return response()->json('not_found', Arr::get($configResponse, "fail_not_found_code", 200));
             }
         }
     }
@@ -300,7 +337,7 @@ class PaymentPassHandler
                 $value1 = $this->translate_parameters($value1, $config, $datos);
                 $value2 = Arr::get($if, "value2", "");
                 $value2 = $this->translate_parameters($value2, $config, $datos);
-                $condition = Arr::get("if", "condition", "=");
+                $condition = Arr::get($if, "condition", "=");
                 switch ($condition) {
                     case "=":
                         if ($value1 != $value2) {
@@ -329,6 +366,56 @@ class PaymentPassHandler
                         break;
                     case "<=":
                         if ($value1 > $value2) {
+                            return false;
+                        }
+                        break;
+                    case "in_array":
+                        if (is_array($value2)) {
+                            $valueArray = $value2;
+                        } else {
+                            $valueArray = [$value2];
+                        }
+                        if (!in_array($value1, $valueArray)) {
+                            return false;
+                        }
+                        break;
+                    case "is_array":
+                        if (!is_array($value1)) {
+                            return false;
+                        }
+                        break;
+                    case "is_not_array":
+                        if (is_array($value1)) {
+                            return false;
+                        }
+                        break;
+                    case "is_int":
+                        if (!is_int($value1)) {
+                            return false;
+                        }
+                        break;
+                    case "is_not_in":
+                        if (is_int($value1)) {
+                            return false;
+                        }
+                        break;
+                    case "is_string":
+                        if (!is_string($value1)) {
+                            return false;
+                        }
+                        break;
+                    case "is_not_string":
+                        if (is_string($value1)) {
+                            return false;
+                        }
+                        break;
+                    case "is_null":
+                        if ($value1 !== null) {
+                            return false;
+                        }
+                        break;
+                    case "is_not_null":
+                        if ($value1 === null) {
                             return false;
                         }
                         break;
@@ -383,6 +470,213 @@ class PaymentPassHandler
     }
 
     /**
+     * Get the headers for AWS Sign v4
+     *
+     * Thanks to https://stackoverflow.com/users/6906592/pravesh-khatana
+     * and https://stackoverflow.com/users/2979377/avik-das
+     *
+     * in https://stackoverflow.com/a/42816847/9229515
+     *
+     * @param PendingRequest $request The request so far
+     * @param array $parameters The parameters (payload)
+     * @param array $actionConfig The configuration array for the action
+     * @return array The headers to use
+     */
+    private function getHeadersForAWSSign(PendingRequest $request, $parameters, $actionConfig)
+    {
+        $action = $actionConfig['action'];
+        $method = Arr::get($actionConfig, 'method', 'post');
+        $host = Str::before(Str::after($action, '//'), '/');
+        $uri = Str::after(Str::before($action, '?'), $host . '/');
+        $json = json_encode($parameters);
+        $obj = json_decode($json);
+        $secretKey = Arr::get($actionConfig, 'authentication.secret', '');
+        $accessKey = Arr::get($actionConfig, 'authentication.key', '');
+        $token = Arr::get($actionConfig, 'authentication.token', '');
+        if ($token == '') {
+            $token = null;
+        }
+        $region = Arr::get($actionConfig, 'authentication.region', '');
+        $service = Arr::get($actionConfig, 'authentication.service_name', '');
+        $headers = Arr::get($actionConfig, 'headers', ['content-type' => 'application/json']);
+        if (Arr::has($headers,'Content-Type')){
+            $headers['content-type'] = $headers['Content-Type'];
+            unset($headers['Content-Type']);
+        }
+        if (Arr::has($headers,'Content-type')){
+            $headers['content-type'] = $headers['Content-type'];
+            unset($headers['Content-type']);
+        }
+
+        $terminationString = 'aws4_request';
+        $algorithm = 'AWS4-HMAC-SHA256';
+        $phpAlgorithm = 'sha256';
+        $canonicalURI = $uri;
+        $canonicalQueryString = '';
+        $signedHeaders = 'content-type;host;x-amz-date';
+        if (isset($token)) {
+            $signedHeaders .= ';x-amz-security-token';
+        }
+
+        $currentDateTime = new DateTime('UTC');
+        $reqDate = $currentDateTime->format('Ymd');
+        $reqDateTime = $currentDateTime->format('Ymd\THis\Z');
+
+        // Create signing key
+        $kSecret = $secretKey;
+        $kDate = hash_hmac($phpAlgorithm, $reqDate, 'AWS4' . $kSecret, true);
+        $kRegion = hash_hmac($phpAlgorithm, $region, $kDate, true);
+        $kService = hash_hmac($phpAlgorithm, $service, $kRegion, true);
+        $kSigning = hash_hmac($phpAlgorithm, $terminationString, $kService, true);
+
+        // Create canonical headers
+        $canonicalHeaders = [];
+        $canonicalHeaders[] = 'content-type:' . Arr::get($headers, "content-type", Arr::get($headers, "Content-Type", "application/json"));
+        $canonicalHeaders[] = 'host:' . $host;
+        $canonicalHeaders[] = 'x-amz-date:' . $reqDateTime;
+        if (isset($token)) {
+            $canonicalHeaders[] = 'x-amz-security-token:' . $token;
+        }
+        $canonicalHeadersStr = implode("\n", $canonicalHeaders);
+
+        // Create request payload
+        $requestHasedPayload = hash($phpAlgorithm, $json);
+
+        // Create canonical request
+        $canonicalRequest = [];
+        $canonicalRequest[] = $method;
+        $canonicalRequest[] = $canonicalURI;
+        $canonicalRequest[] = $canonicalQueryString;
+        $canonicalRequest[] = $canonicalHeadersStr . "\n";
+        $canonicalRequest[] = $signedHeaders;
+        $canonicalRequest[] = $requestHasedPayload;
+        $requestCanonicalRequest = implode("\n", $canonicalRequest);
+        $requestHasedCanonicalRequest = hash($phpAlgorithm, utf8_encode($requestCanonicalRequest));
+
+        // Create scope
+        $credentialScope = [];
+        $credentialScope[] = $reqDate;
+        $credentialScope[] = $region;
+        $credentialScope[] = $service;
+        $credentialScope[] = $terminationString;
+        $credentialScopeStr = implode('/', $credentialScope);
+
+        // Create string to signing
+        $stringToSign = [];
+        $stringToSign[] = $algorithm;
+        $stringToSign[] = $reqDateTime;
+        $stringToSign[] = $credentialScopeStr;
+        $stringToSign[] = $requestHasedCanonicalRequest;
+        $stringToSignStr = implode("\n", $stringToSign);
+
+        $this->lanzarDump(["llamando awsSing de {$this->service}" => [
+            "canonical" => $canonicalRequest,
+            "method" => $method,
+            "headers" => $headers,
+            "uri" => $uri,
+            "host" => $host,
+            "data" => $parameters,
+            "caninicalHeaders" => [$canonicalHeaders, $requestCanonicalRequest],
+            "String to Sign" => [$stringToSign, $stringToSignStr],
+        ]]);
+
+        // Create signature
+        $signature = hash_hmac($phpAlgorithm, $stringToSignStr, $kSigning);
+
+        // Create authorization header
+        $authorizationHeader = [];
+        $authorizationHeader[] = 'Credential=' . $accessKey . '/' . $credentialScopeStr;
+        $authorizationHeader[] = 'SignedHeaders=' . $signedHeaders;
+        $authorizationHeader[] = 'Signature=' . ($signature);
+        $authorizationHeaderStr = $algorithm . ' ' . implode(', ', $authorizationHeader);
+
+
+        // Request headers
+        //$headers = [];
+        $headers = array_merge($headers, [
+            'authorization' => $authorizationHeaderStr,
+            'content-length' => strlen($json),
+            'host' => $host,
+            'x-amz-date' => $reqDateTime,
+        ]);
+        if (isset($token)) {
+            $headers[] = 'x-amz-security-token: ' . $token;
+        }
+
+        $this->lanzarDump(["headers de awsSing de {$this->service}" => [
+            "headers" => $headers,
+        ]]);
+        return $headers;
+
+        if (isset($obj->method)) {
+            $m = explode("|", $obj->method);
+            $method = $m[0];
+            $uri .= $m[1];
+        }
+
+        $secretKey = Arr::get($actionConfig, 'authentication.secret', '');
+        $access_key = Arr::get($actionConfig, 'authentication.key', '');
+        $token = Arr::get($actionConfig, 'authentication.token', '');
+        if ($token == '') {
+            $token = null;
+        }
+        $region = Arr::get($actionConfig, 'authentication.region', '');
+        $service = Arr::get($actionConfig, 'authentication.service_name', '');
+
+        $headers = [];
+
+        $alg = 'sha256';
+        $date = new DateTime('UTC');
+        $dd = $date->format('Ymd\THis\Z');
+
+        $amzdate2 = new DateTime('UTC');
+        $amzdate2 = $amzdate2->format('Ymd');
+        $amzdate = $dd;
+
+        $algorithm = 'AWS4-HMAC-SHA256';
+
+        if ($parameters == null || empty($parameters)) {
+            $param = "";
+        } else {
+            $param = $json;
+            if ($param == "{}") {
+                $param = "";
+            }
+        }
+
+        $requestPayload = strtolower($param);
+        $hashedPayload = hash($alg, $requestPayload);
+
+        $canonical_uri = $uri;
+        $canonical_querystring = '';
+
+        $canonical_headers = "content-type:" . "application/json" . "\n" . "host:" . $host . "\n" . "x-amz-date:" . $amzdate . "\n" . "x-amz-security-token:" . $token . "\n";
+        $signed_headers = 'content-type;host;x-amz-date;x-amz-security-token';
+        $canonical_request = "" . $method . "\n" . $canonical_uri . "\n" . $canonical_querystring . "\n" . $canonical_headers . "\n" . $signed_headers . "\n" . $hashedPayload;
+
+
+        $credential_scope = $amzdate2 . '/' . $region . '/' . $service . '/' . 'aws4_request';
+        $string_to_sign  = "" . $algorithm . "\n" . $amzdate . "\n" . $credential_scope . "\n" . hash('sha256', $canonical_request) . "";
+        //string_to_sign is the answer..hash('sha256', $canonical_request)//
+
+        $kSecret = 'AWS4' . $secretKey;
+        $kDate = hash_hmac($alg, $amzdate2, $kSecret, true);
+        $kRegion = hash_hmac($alg, $region, $kDate, true);
+        $kService = hash_hmac($alg, $service, $kRegion, true);
+        $kSigning = hash_hmac($alg, 'aws4_request', $kService, true);
+        $signature = hash_hmac($alg, $string_to_sign, $kSigning);
+        $authorization_header = $algorithm . ' ' . 'Credential=' . $access_key . '/' . $credential_scope . ', ' .  'SignedHeaders=' . $signed_headers . ', ' . 'Signature=' . $signature;
+
+        $headers = [
+            'content-type' => 'application/json',
+            'x-amz-security-token' => $token,
+            'x-amz-date' => $amzdate,
+            'Authorization' => $authorization_header
+        ];
+        return $headers;
+    }
+
+    /**
      * Execute an action from the configuration array, it could be an http request or an SDK call
      *
      * @param string $action The name of the action in the configuration array
@@ -398,7 +692,7 @@ class PaymentPassHandler
     {
         if ($actionConfig != null && is_array($actionConfig) && count($actionConfig) > 0) {
             $this->actualizarParametros($curConfig, $actionConfig, $data);
-            if ($this->conditionsFunction(Arr::get($actionConfig, "if", []), $curConfig, $data)) {
+            if ($this->conditionsFunction(Arr::get($actionConfig, "if", []), $curConfig, $data) === true) {
                 if ($con_preactions === null) {
                     $con_preactions = Arr::get($actionConfig, 'ejecutar_pre_actions', true);
                 }
@@ -433,9 +727,13 @@ class PaymentPassHandler
                         }
                         $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $actionConfig))->just(['pre_action'])->translate();
                     }
+                    $callParameters = $this->translate_parameters(Arr::get($actionConfig, 'call_parameters', []), $curConfig, $data);
                     $httpRequest = Http::retry(3, 100);
-                    if (count(Arr::get($actionConfig, 'headers', [])) > 0) {
+                    if (count(Arr::get($actionConfig, 'headers', [])) > 0 && Arr::get($actionConfig, 'authentication.type', 'nada') != 'aws_sign_v4') {
                         $httpRequest = $httpRequest->withHeaders($actionConfig['headers']);
+                    }
+                    if (Arr::get($actionConfig, 'asForm', false) || Arr::get($actionConfig, 'headers.Content-Type', "") == "application/x-www-form-urlencoded") {
+                        $httpRequest = $httpRequest->asForm();
                     }
                     if (Arr::get($actionConfig, 'authentication.type', 'nada') == 'basic' && Arr::has($actionConfig, ['authentication.user', 'authentication.secret'])) {
                         $httpRequest = $httpRequest->withBasicAuth(Arr::get($actionConfig, 'authentication.user', ''), Arr::get($actionConfig, 'authentication.secret', ''));
@@ -443,16 +741,16 @@ class PaymentPassHandler
                         $httpRequest = $httpRequest->withDigestAuth(Arr::get($actionConfig, 'authentication.user', ''), Arr::get($actionConfig, 'authentication.secret', ''));
                     } elseif (Arr::get($actionConfig, 'authentication.type', 'nada') == 'token' && Arr::has($actionConfig, 'authentication.token')) {
                         $httpRequest = $httpRequest->withToken(Arr::get($actionConfig, 'authentication.token', ''));
-                    }
-                    if (Arr::get($actionConfig, 'asForm', false) || Arr::get($actionConfig, 'headers.Content-Type', "") == "application/x-www-form-urlencoded") {
-                        $httpRequest = $httpRequest->asForm();
+                    } elseif (Arr::get($actionConfig, 'authentication.type', 'nada') == 'aws_sign_v4' && Arr::has($actionConfig, 'authentication.region') && Arr::has($actionConfig, 'authentication.service_name') && Arr::has($actionConfig, 'authentication.key') && Arr::has($actionConfig, 'authentication.secret')) {
+                        $httpRequest = $httpRequest->withHeaders($this->getHeadersForAWSSign($httpRequest, $callParameters, $actionConfig));
                     }
                     if (in_array(Arr::get($actionConfig, 'method', ''), ['get', 'post', 'put', 'patch', 'delete']) && Arr::get($actionConfig, 'action', '') != '') {
-                        $this->lanzarDump(["llamando $action de {$this->service}" => [
-                            "actionConfig" => $actionConfig
-                        ]]);
                         try {
-                            $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], Arr::get($actionConfig, 'call_parameters', []));
+                            $this->lanzarDump(["llamando $action de {$this->service}" => [
+                                "actionConfig" => $actionConfig,
+                                "callParameters" => $callParameters,
+                            ]]);
+                            $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], $callParameters);
                             if ($response->successful()) {
                                 if ($con_mapearRespuesta) {
                                     $datosDevolver = [];
@@ -548,9 +846,9 @@ class PaymentPassHandler
                 $reRevisar = true;
             } elseif (is_array($field_name)) {
                 $resultado = $this->subMapear($field_name, $result, $reRevisar);
-                if ($preFieldsName != ""){
+                if ($preFieldsName != "") {
                     data_set($actionConfig, $preFieldsName, $resultado);
-                }elseif (count($actionConfig) == 0) {
+                } elseif (count($actionConfig) == 0) {
                     $actionConfig = $resultado;
                 }
             }
@@ -603,7 +901,7 @@ class PaymentPassHandler
 
     /**
      * Update the parameters values in a configuration array.
-     * Mainly referenceCode, Signature of an action and responses urls
+     * Mainly referenceCode, Signature of an action and webhooks urls
      *
      * It updates the parameters $curConfig and $actionConfig
      * @param array $curConfig Current configuration, its updated
@@ -618,13 +916,13 @@ class PaymentPassHandler
             $curConfig['service']['referenceCode']['ya_procesado'] = true;
             $curConfig = (new PaymentPassTranslator($data, $curConfig, $curConfig))->translate();
         }
-        foreach (Arr::get($curConfig, "service.responses", []) as $responseName => $responseData) {
+        foreach (Arr::get($curConfig, "service.webhooks", []) as $responseName => $responseData) {
             $responseUrl = Arr::get($responseData, "url", "");
             if ($responseUrl == "") {
-                $curConfig['service']['responses'][$responseName]['url'] = route("paymentpass::response", ["service" => $this->service, "responseType" => $responseName]);
+                $curConfig['service']['webhooks'][$responseName]['url'] = route("paymentpass::response", ["service" => $this->service, "responseType" => $responseName]);
             }
-            if (Arr::get($curConfig, "service.responses." . $responseName . ".url_field_name", "") != "") {
-                data_set($curConfig, 'service.parameters.' . Arr::get($curConfig, "service.responses." . $responseName . ".url_field_name"), Arr::get($curConfig, "service.responses." . $responseName . ".url", ""));
+            if (Arr::get($curConfig, "service.webhooks." . $responseName . ".url_field_name", "") != "") {
+                data_set($curConfig, 'service.parameters.' . Arr::get($curConfig, "service.webhooks." . $responseName . ".url_field_name"), Arr::get($curConfig, "service.webhooks." . $responseName . ".url", ""));
             }
         }
         if ($actionConfig != null) {
@@ -722,7 +1020,7 @@ class PaymentPassHandler
             $formConfig["id"] = "paymentpass_{$this->service}";
         }
         $this->lanzarDump(["para form" => [
-            'config' => Arr::except($curConfig, ["service.actions", "service.form", "service.responses"]),
+            'config' => Arr::except($curConfig, ["service.actions", "service.form", "service.webhooks"]),
             'formConfig' => $formConfig,
             'service' => $this->service,
             'datos' => $data,
@@ -920,20 +1218,7 @@ class PaymentPassHandler
                 $aux = str_replace('__service_parameters__', '', $param_config_array);
                 return Arr::get($service['parameters'], $aux, $aux);
             } else {
-                $item = PaymentPassTranslator::translateString($param_config_array, "__route__", "route");
-                $item = PaymentPassTranslator::translateString($item, "__url__", "url");
-                if (function_exists('trans_article')) {
-                    $item = PaymentPassTranslator::translateString($item, "__trans_article__", "trans_article");
-                }
-                $item = PaymentPassTranslator::translateString($item, "__data__", "data", $data);
-                $item = PaymentPassTranslator::translateString($item, "__request__", "data", $data);
-                $item = PaymentPassTranslator::translateString($item, "__trans__", "trans");
-                $item = PaymentPassTranslator::translateString($item, "__asset__", "asset");
-                $item = PaymentPassTranslator::translateString($item, "__session_id__", "session_id");
-                $item = PaymentPassTranslator::translateString($item, "__device_session_id__", "device_session_id");
-                $item = PaymentPassTranslator::translateString($item, "__ip_address__", "ip_address");
-                $item = PaymentPassTranslator::translateString($item, "__user_agent__", "user_agent");
-                $item = PaymentPassTranslator::translateString($item, "__config_paymentpass__", "config_paymentpass", $data, $config);
+                $item = (new PaymentPassTranslator())->transSingleString($param_config_array, $data, $config);
                 return $item;
             }
         } elseif (count($param_config_array) > 0) {
