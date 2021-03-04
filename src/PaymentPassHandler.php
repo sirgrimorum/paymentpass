@@ -28,16 +28,20 @@ class PaymentPassHandler
 
     function __construct($service = "", $config = "")
     {
-        if ($config == "" || !is_array($config) || (is_array($config) && !Arr::has($config, "available_services.$service"))) {
-            $this->configSrc = config("sirgrimorum.paymentpass");
-        } else {
-            $this->configSrc = $config;
-        }
+        $this->cargarConfig($config);
         if (!Arr::has($this->configSrc, "available_services.$service")) {
             $service = $this->configSrc["available_services"][0];
         }
         $this->service = $service;
         $this->config = $this->buildConfig();
+    }
+
+    private function cargarConfig( $config = ""){
+        if ($config == "" || !is_array($config) || (is_array($config) && !Arr::has($config, "available_services.$service"))) {
+            $this->configSrc = config("sirgrimorum.paymentpass");
+        } else {
+            $this->configSrc = $config;
+        }
     }
 
     /**
@@ -139,6 +143,7 @@ class PaymentPassHandler
      */
     public function handleResponse(Request $request, string $service = "", string $responseType)
     {
+        $this->cargarConfig();
         if (in_array($service, $this->configSrc["available_services"])) {
             $this->service = $service;
             $this->config = $this->buildConfig();
@@ -1320,9 +1325,9 @@ class PaymentPassHandler
     {
         $auxConfig = $this->configSrc;
         $config = Arr::except($auxConfig, ['services_production', 'services_test']);
-        $serviceProd = Arr::get($auxConfig, 'services_production.' . $this->service, []);
+        $serviceProd = Arr::get($auxConfig, 'services_production.' . $this->service, config("sirgrimorum.paymentpass_services.{$this->service}.service", config("sirgrimorum.paymentpass_services.{$this->service}", [])));
         if (!Arr::get($auxConfig, 'production', false)) {
-            $serviceTest = Arr::get($auxConfig, 'services_test.' . $this->service, []);
+            $serviceTest = Arr::get($auxConfig, 'services_test.' . $this->service, config("sirgrimorum.paymentpass_services.{$this->service}.test", []));
             $serviceProd = $this->smartMergeConfig($serviceProd, $serviceTest);
         }
         $config['service'] = $serviceProd;
