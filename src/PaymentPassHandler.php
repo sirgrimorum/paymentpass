@@ -28,7 +28,7 @@ class PaymentPassHandler
 
     function __construct($service = "", $config = "")
     {
-        $this->cargarConfig($config);
+        $this->cargarConfig($service, $config);
         if (!Arr::has($this->configSrc, "available_services.$service")) {
             $service = $this->configSrc["available_services"][0];
         }
@@ -36,7 +36,8 @@ class PaymentPassHandler
         $this->config = $this->buildConfig();
     }
 
-    private function cargarConfig( $config = ""){
+    private function cargarConfig($service = "", $config = "")
+    {
         if ($config == "" || !is_array($config) || (is_array($config) && !Arr::has($config, "available_services.$service"))) {
             $this->configSrc = config("sirgrimorum.paymentpass");
         } else {
@@ -143,7 +144,7 @@ class PaymentPassHandler
      */
     public function handleResponse(Request $request, string $service = "", string $responseType)
     {
-        $this->cargarConfig();
+        $this->cargarConfig($service);
         if (in_array($service, $this->configSrc["available_services"])) {
             $this->service = $service;
             $this->config = $this->buildConfig();
