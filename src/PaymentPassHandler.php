@@ -499,11 +499,11 @@ class PaymentPassHandler
         $region = Arr::get($actionConfig, 'authentication.region', '');
         $service = Arr::get($actionConfig, 'authentication.service_name', '');
         $headers = Arr::get($actionConfig, 'headers', ['content-type' => 'application/json']);
-        if (Arr::has($headers,'Content-Type')){
+        if (Arr::has($headers, 'Content-Type')) {
             $headers['content-type'] = $headers['Content-Type'];
             unset($headers['Content-Type']);
         }
-        if (Arr::has($headers,'Content-type')){
+        if (Arr::has($headers, 'Content-type')) {
             $headers['content-type'] = $headers['Content-type'];
             unset($headers['Content-type']);
         }
@@ -740,7 +740,7 @@ class PaymentPassHandler
                     } elseif (Arr::get($actionConfig, 'authentication.type', 'nada') == 'digest' && Arr::has($actionConfig, ['authentication.user', 'authentication.secret'])) {
                         $httpRequest = $httpRequest->withDigestAuth(Arr::get($actionConfig, 'authentication.user', ''), Arr::get($actionConfig, 'authentication.secret', ''));
                     } elseif (Arr::get($actionConfig, 'authentication.type', 'nada') == 'token' && Arr::has($actionConfig, 'authentication.token')) {
-                        $httpRequest = $httpRequest->withToken(Arr::get($actionConfig, 'authentication.token', ''));
+                        $httpRequest = $httpRequest->withToken(Arr::get($actionConfig, 'authentication.token', ''), Arr::get($actionConfig, 'authentication.token_type', 'Bearer'));
                     } elseif (Arr::get($actionConfig, 'authentication.type', 'nada') == 'aws_sign_v4' && Arr::has($actionConfig, 'authentication.region') && Arr::has($actionConfig, 'authentication.service_name') && Arr::has($actionConfig, 'authentication.key') && Arr::has($actionConfig, 'authentication.secret')) {
                         $httpRequest = $httpRequest->withHeaders($this->getHeadersForAWSSign($httpRequest, $callParameters, $actionConfig));
                     }
@@ -1212,15 +1212,8 @@ class PaymentPassHandler
     {
         $service = $config['service'];
         if (!is_array($param_config_array)) {
-            if ($param_config_array == '__service_parameters_all__') {
-                return $service['parameters'];
-            } elseif (stripos($param_config_array, '__service_parameters__') !== false) {
-                $aux = str_replace('__service_parameters__', '', $param_config_array);
-                return Arr::get($service['parameters'], $aux, $aux);
-            } else {
-                $item = (new PaymentPassTranslator())->transSingleString($param_config_array, $data, $config);
-                return $item;
-            }
+            $item = (new PaymentPassTranslator())->transSingleString($param_config_array, $data, $config);
+            return $item;
         } elseif (count($param_config_array) > 0) {
             $return_params = [];
             foreach ($param_config_array as $keyParameter => $config_parameter) {

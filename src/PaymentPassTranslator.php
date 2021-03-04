@@ -77,6 +77,8 @@ class PaymentPassTranslator
         "config_action",
         "pre_action",
         "config_paymentpass",
+        "service_parameters_all",
+        "service_parameters",
         "auto",
     ];
 
@@ -195,6 +197,8 @@ class PaymentPassTranslator
             "pre_action" => $result,
             "config_paymentpass" => $result,
             "auto" => $result,
+            "service_parameters" => $configComplete,
+            "service_parameters_all" => $configComplete,
         ];
         $functionsToProcess = $this->functionsToProcess;
         if (in_array("auto", $functionsToProcess)){
@@ -273,6 +277,10 @@ class PaymentPassTranslator
                                 $piece = session()->getId();
                             } elseif ($function == 'device_session_id') {
                                 $piece = md5(session()->getId() . microtime());
+                            } elseif ($function == 'service_parameters_all') {
+                                $piece = Arr::get($config, "service.parameters", []);
+                            } elseif ($function == 'service_parameters') {
+                                $piece = Arr::get($config, "service.parameters.$textPiece", $textPiece);
                             } elseif ($function == 'data') {
                                 $piece = PaymentPassTranslator::getValor($textPiece, $data);
                             } elseif ($function == 'auto') {
