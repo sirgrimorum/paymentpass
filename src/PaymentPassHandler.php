@@ -23,12 +23,18 @@ class PaymentPassHandler
 
     protected $service;
     public $config;
+    public $configSrc;
     protected $payment = null;
 
-    function __construct($service = "")
+    function __construct($service = "", $config = "")
     {
-        if (!in_array($service, config("sirgrimorum.paymentpass.available_services"))) {
-            $service = config("sirgrimorum.paymentpass.available_services")[0];
+        if ($config == "" || !is_array($config) || (is_array($config) && !Arr::has($config, "available_services.$service"))) {
+            $this->configSrc = config("sirgrimorum.paymentpass");
+        } else {
+            $this->configSrc = $config;
+        }
+        if (!Arr::has($this->configSrc, "available_services.$service")) {
+            $service = $this->configSrc["available_services"][0];
         }
         $this->service = $service;
         $this->config = $this->buildConfig();
@@ -133,7 +139,7 @@ class PaymentPassHandler
      */
     public function handleResponse(Request $request, string $service = "", string $responseType)
     {
-        if (in_array($service, config("sirgrimorum.paymentpass.available_services"))) {
+        if (in_array($service, $this->configSrc["available_services"])) {
             $this->service = $service;
             $this->config = $this->buildConfig();
         }
@@ -1312,7 +1318,7 @@ class PaymentPassHandler
      */
     private function buildConfig()
     {
-        $auxConfig = config("sirgrimorum.paymentpass");
+        $auxConfig = $this->configSrc;
         $config = Arr::except($auxConfig, ['services_production', 'services_test']);
         $serviceProd = Arr::get($auxConfig, 'services_production.' . $this->service, []);
         if (!Arr::get($auxConfig, 'production', false)) {
