@@ -29,7 +29,7 @@ class PaymentPassHandler
     function __construct($service = "", $config = "")
     {
         $this->cargarConfig($service, $config);
-        if (!Arr::has($this->configSrc, "available_services.$service")) {
+        if (!in_array($service, $this->configSrc["available_services"])) {
             $service = $this->configSrc["available_services"][0];
         }
         $this->service = $service;
@@ -847,6 +847,9 @@ class PaymentPassHandler
      */
     private function mapearRespuesta($curConfig, &$actionConfig, $result = null, $data = [], $curActionConfig = null, $preFieldsName = "call_parameters.")
     {
+        if (is_string($result) && $this->isJsonString($result)) {
+            $result = json_decode($result, true);
+        }
         if ($curActionConfig === null) {
             $curActionConfig == $actionConfig;
         }
