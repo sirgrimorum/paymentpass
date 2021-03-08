@@ -718,7 +718,7 @@ class PaymentPassHandler
                     }
                     $this->lanzarDump(["llamando $action de {$this->service}" => [
                         "actionConfig" => $actionConfig
-                    ]]);
+                    ]], true);
                     $resultadoAction = $this->callSdkFunction($actionConfig, $curConfig, $data);
                     if ($con_mapearRespuesta) {
                         $datosDevolver = [];
@@ -729,7 +729,7 @@ class PaymentPassHandler
                     $this->lanzarDump(["resultado $action de {$this->service}" => [
                         "resultadoAction" => $resultadoAction,
                         "datosDevolver" => $datosDevolver
-                    ]]);
+                    ]], true);
                     return $datosDevolver;
                 } elseif ($actionConfig['type'] == "http") {
                     if ($con_preactions && Arr::has($curConfig['service'], "pre_actions")) {
@@ -761,7 +761,7 @@ class PaymentPassHandler
                             $this->lanzarDump(["llamando $action de {$this->service}" => [
                                 "actionConfig" => $actionConfig,
                                 "callParameters" => $callParameters,
-                            ]]);
+                            ]], true);
                             $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], $callParameters);
                             if ($response->successful()) {
                                 if ($con_mapearRespuesta) {
@@ -773,7 +773,7 @@ class PaymentPassHandler
                                 $this->lanzarDump(["resultado $action de {$this->service}" => [
                                     "response" => $response->json(),
                                     "datosDevolver" => $datosDevolver
-                                ]]);
+                                ]], true);
                                 return $datosDevolver;
                             } else {
                                 $response->throw();
@@ -1426,11 +1426,14 @@ class PaymentPassHandler
         }
     }
 
-    private function lanzarDump($datos)
+    private function lanzarDump($datos, $mostrarJson = false)
     {
         if (!Arr::get($this->config, "production", false) && Arr::get($this->config, "mostrarEchos", false)) {
             if (!request()->wantsJson()) {
                 dump($datos);
+                if (Arr::get($this->config, "mostrarJsonEchos", false) && $mostrarJson){
+                    echo "<pre><code>" . json_encode($datos, JSON_PRETTY_PRINT) . "</code></pre>";
+                }
             }
         }
     }

@@ -20,6 +20,7 @@ return [
     'available_services' => ['payu'],
     'production' => false,
     'mostrarEchos' => false,
+    'mostrarJsonEchos' => false,
     'saveAll' => false,
     'result_template' => 'paymentpass::result', // blade template to show in the result
     'services_production' => [ // original configuration for the services, test mode will overwrite this with the services_test configurations
