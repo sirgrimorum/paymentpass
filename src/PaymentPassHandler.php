@@ -857,7 +857,7 @@ class PaymentPassHandler
         if (($field_name = Arr::get($curActionConfig, "field_name", false))) {
             if (is_string($field_name)) {
                 data_set($actionConfig, $preFieldsName . $field_name, $result);
-                $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
+                $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig, false, false))->translate();
                 $reRevisar = true;
             } elseif (is_array($field_name)) {
                 $resultado = $this->subMapear($field_name, $result, $reRevisar);
@@ -871,7 +871,7 @@ class PaymentPassHandler
             $actionConfig = $result;
         }
         if ($reRevisar) {
-            $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig))->translate();
+            $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $curConfig, false, false))->translate($actionConfig);
         }
     }
 
@@ -892,26 +892,48 @@ class PaymentPassHandler
             $reRevisar = true;
             if ($field_name == "__all__") {
                 return $result;
+            } elseif ( Str::startsWith($field_name, 'boolean|')) {
+                $datosParameters = explode(",", str_replace("boolean|","", $field_name));
+                if (count($datosParameters) == 1) {
+                    $piece = $this->getValorDesde($result, $datosParameters[0]) == true;
+                } elseif (count($datosParameters) == 2) {
+                    $piece = $this->getValorDesde($result, $datosParameters[0]) == $this->getValorDesde($result, $datosParameters[1]);
+                } else {
+                    $piece = false;
+                }
+                return $piece;
             } elseif (($field_name == 'true' || $field_name == 'false')) {
                 return $field_name == 'true';
             } elseif ($field_name !== null) {
-                if (is_array($result) && $result !== null) {
-                    return Arr::get($result, $field_name, $field_name);
-                } elseif (is_object($result) && $result !== null) {
-                    if (property_exists($result, $field_name)) {
-                        if (is_callable([$result, $field_name])) {
-                            return $result->{$field_name}();
-                        } else {
-                            return $result->{$field_name};
-                        }
-                    }
-                } else {
-                    return $result;
-                }
+                return $this->getValorDesde($result, $field_name);
             }
         }
         $reRevisar = false;
         return $field_name;
+    }
+
+    /**
+     * Get the value of a field from an array or object
+     * @param array|object $data The place to take the field from
+     * @param string $field_name The key or property name
+     * @return mix The result
+     */
+    private function getValorDesde($data, $field_name){
+        if (is_array($data) && $data !== null) {
+            return Arr::get($data, $field_name, $field_name);
+        } elseif (is_object($data) && $data !== null) {
+            if (property_exists($data, $field_name)) {
+                if (is_callable([$data, $field_name])) {
+                    return $data->{$field_name}();
+                } else {
+                    return $data->{$field_name};
+                }
+            } elseif (strpos($field_name, ".") !== false){
+                return Arr::get((array) $data, $field_name, $field_name);
+            }
+        } else {
+            return $data;
+        }
     }
 
     /**
