@@ -274,7 +274,7 @@ return [
                 'payerDocument' => '__data__cedula',
                 'mobilePhone' => '__data__telefono',
                 'payerPhone' => '__data__telefono',
-                'taxReturnBase' => '__auto__taxReturnBase|0.19,__data__value__,2', // auto is __auto__[type, options are taxReturnBase|tax,value,number of decimals ; tax|tax,base,number of decimals ; valueToPay|tax,base,number of decimals]|[parameters separates with ,]|[fields separates with ,] - auto evaluates after everithing else
+                'taxReturnBase' => '__auto__taxReturnBase|0.19,__data__value__,2', // auto is __auto__[type, options are taxReturnBase|tax,value,number of decimals ; tax|tax,base,number of decimals ; valueToPay|tax,base,number of decimals ; boolean|field that must be true ; boolean|field to compare 1, field to compare 2 ]|[parameters separates with ,]|[fields separates with ,] - auto evaluates after everithing else
                 'tax' => '__auto__tax|0.19,taxReturnBase,2',
             ],
             'referenceCode' => [ //referenceCode of the transaction intent

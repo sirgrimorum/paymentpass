@@ -61,7 +61,7 @@ return [
                 'name' => 'init_point', // name of the function/attribute to call
                 'call_parameters' => ['parameter'], // parameters to pass to the function for the 'function' type option, use '__service_parameters__fild_name' for fields in the proccesed service parameters array, '__service_parameters_all__' pass the proccesed parameters array including the webhooks urls
                 'field_name' => [ // How to map the result. Set to false to not map the result, 'result_fieldname' => 'response_fieldname', use __all__ for all the response
-                    'field_name' => 'field_name_origin',
+                    'field_name' => 'field_name_origin', // boolean|field 1 to compare, field 2 to compare or auto (using data and result) or auto_config (using config and result) is __auto__[type, options are taxReturnBase|tax,value,number of decimals ; tax|tax,base,number of decimals ; valueToPay|tax,base,number of decimals ; boolean|field that must be true ; boolean|field to compare 1, field to compare 2 ]|[parameters separates with ,]|[fields separates with ,] - auto evaluates after everithing else
                 ],
             ],
             'http_action' => [
@@ -101,7 +101,7 @@ return [
                 ],
                 'call_parameters' => ['parameter'], // parameters to pass to the http call, use '__service_parameters__fild_name' for fields in the proccesed service parameters array, '__service_parameters_all__' pass the proccesed parameters array including the webhooks urls
                 'field_name' => [ // How to map the result. Set to false to not map the result, 'result_fieldname' => 'response_fieldname', use __all__ for all the response
-                    'field_name' => 'field_name_origin',
+                    'field_name' => 'field_name_origin' , // boolean|field 1 to compare, field 2 to compare or auto (using data and result) or auto_config (using config and result) is __auto__[type, options are taxReturnBase|tax,value,number of decimals ; tax|tax,base,number of decimals ; valueToPay|tax,base,number of decimals ; boolean|field that must be true ; boolean|field to compare 1, field to compare 2 ]|[parameters separates with ,]|[fields separates with ,] - auto evaluates after everithing else
                 ],
             ],
         ],
@@ -116,6 +116,8 @@ return [
                     'unit_price' => '__data__product_value',
                     //'picture_url' => '__asset____data__product_picture', //first evaluate '__data__product_picture' and then asset of that
                     'category_id' => '__data__product_category',
+                    'taxReturnBase' => '__auto__taxReturnBase|0.19,__data__value__,2', // auto (using data and result) or auto_config (using config and result) is __auto__[type, options are taxReturnBase|tax,value,number of decimals ; tax|tax,base,number of decimals ; valueToPay|tax,base,number of decimals ; boolean|field that must be true ; boolean|field to compare 1, field to compare 2 ]|[parameters separates with ,]|[fields separates with ,] - auto evaluates after everithing else
+                    'tax' => '__auto__tax|0.19,taxReturnBase,2',
                 ]
             ],
             //'items' => '__data__items', // other option
