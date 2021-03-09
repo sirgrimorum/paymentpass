@@ -57,6 +57,13 @@ class PaymentPassTranslator
     protected $just = [];
 
     /**
+     * if change the boolean values for strings, default is true
+     *
+     * @var  bool
+     */
+    protected $booleanAsStr = true;
+
+    /**
      * All the functions currently available
      *
      * @var array
@@ -80,6 +87,8 @@ class PaymentPassTranslator
         "service_parameters_all",
         "service_parameters",
         "auto",
+        "auto_config",
+        "post",
     ];
 
     /**
@@ -89,12 +98,13 @@ class PaymentPassTranslator
      */
     private $functionsToProcess;
 
-    function __construct(array $data = [], array $config = [], array $configComplete = [], $request = false)
+    function __construct(array $data = [], array $config = [], array $configComplete = [], $request = false, $booleanAsStr = true)
     {
         $this->data = $data;
         $this->config = $config;
         $this->configComplete = $configComplete;
         $this->request = $request;
+        $this->booleanAsStr = $booleanAsStr;
         $this->except($this->except);
     }
 
@@ -179,9 +189,10 @@ class PaymentPassTranslator
      * @param array $configComplete The complete config so far
      * @param array $result Optional, the result of the translate so far
      * @param boolean $request Optional, if the data is request data or not, if different from false, "__request__" will operate with "__data__"
+     * @param string $close Optional, the closing string for the prefix, default is '__'
      * @return string The string with the results of the evaluations
      */
-    public function transSingleString($item, $data, $configComplete, $result = [], $request = false){
+    public function transSingleString($item, $data, $configComplete, $result = [], $request = false, $close = "__"){
 
         $dataParaFunctions = [
             "data" => $data,
@@ -191,12 +202,14 @@ class PaymentPassTranslator
             "pre_action" => Arr::get($configComplete, "datosPre", []),
             "config_paymentpass" => $configComplete,
             "auto" => $data,
+            "auto_config" => $this->config,
         ];
         $configParaFunctions = [
             "config_action" => $result,
             "pre_action" => $result,
             "config_paymentpass" => $result,
             "auto" => $result,
+            "auto_config" => $result,
             "service_parameters" => $configComplete,
             "service_parameters_all" => $configComplete,
         ];
@@ -207,9 +220,9 @@ class PaymentPassTranslator
         $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
         foreach($this->functionsToProcess as $function){
             if ($request !== false && $function == "data") {
-                $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []));
+                $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $this->booleanAsStr);
             } else {
-                $item = PaymentPassTranslator::translateString($item, "__{$function}__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []));
+                $item = PaymentPassTranslator::translateString($item, "__{$function}__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $this->booleanAsStr);
             }
         }
         return $item;
@@ -229,9 +242,10 @@ class PaymentPassTranslator
      * @param array $data Optional, The data with optional parameters
      * @param array $config Optional, The complete config so far
      * @param string $close Optional, the closing string for the prefix, default is '__'
+     * @param bool $booleanAsStr if change the boolean values for strings, default is true
      * @return string The string with the results of the evaluations
      */
-    public static function translateString($item, $prefix, $function, $data = [], $config = [], $close = "__")
+    public static function translateString($item, $prefix, $function, $data = [], $config = [], $close = "__", $booleanAsStr = true)
     {
         if (isset($item)) {
             $result = "";
@@ -283,17 +297,25 @@ class PaymentPassTranslator
                                 $piece = Arr::get($config, "service.parameters.$textPiece", $textPiece);
                             } elseif ($function == 'data') {
                                 $piece = PaymentPassTranslator::getValor($textPiece, $data);
-                            } elseif ($function == 'auto') {
+                            } elseif ($function == 'post') {
+                                $resto = explode(":", $textPiece);
+                                $postFunction = array_shift($resto);
+                                if (count($resto) > 1){
+                                    $restoStr = implode(":", $resto);
+                                }elseif (count($resto)==1){
+                                    $restoStr = $resto[0];
+                                }else{
+                                    $restoStr = "";
+                                }
+                                $piece = "__{$postFunction}__$restoStr";
+                            } elseif ($function == 'auto' || $function == 'auto_config') {
                                 $datos = explode("|", $textPiece);
                                 if (count($datos) > 2) {
                                     $datosParameters = explode(",", $datos[1]);
-                                    $datosFields = explode(",", $datos[2]);
                                 } elseif (count($datos) > 1) {
                                     $datosParameters = explode(",", $datos[1]);
-                                    $datosFields = [];
                                 } else {
                                     $datosParameters = [];
-                                    $datosFields = [];
                                 }
                                 switch ($datos[0]) {
                                     case "taxReturnBase":
@@ -367,7 +389,7 @@ class PaymentPassTranslator
                         }
                         if (is_object($piece) || is_array($piece)) {
                             $piece = json_encode($piece);
-                        } elseif (is_bool($piece)) {
+                        } elseif (is_bool($piece) && $booleanAsStr) {
                             $piece = ($piece) ? "true" : "false";
                         }
                         if (is_string($piece) || is_numeric($piece)) {
