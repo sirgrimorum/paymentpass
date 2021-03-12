@@ -1353,6 +1353,11 @@ class PaymentPassHandler
     {
         $auxConfig = $this->configSrc;
         $config = Arr::except($auxConfig, ['services_production', 'services_test']);
+        if (($configServicio = config("sirgrimorum.paymentpass_services.{$this->service}.config", false)) !== false){
+            if (is_array($configServicio)){
+                $config = $this->smartMergeConfig($config, $configServicio);
+            }
+        }
         $serviceProd = Arr::get($auxConfig, 'services_production.' . $this->service, config("sirgrimorum.paymentpass_services.{$this->service}.service", config("sirgrimorum.paymentpass_services.{$this->service}", [])));
         if (!Arr::get($auxConfig, 'production', false)) {
             $serviceTest = Arr::get($auxConfig, 'services_test.' . $this->service, config("sirgrimorum.paymentpass_services.{$this->service}.test", []));

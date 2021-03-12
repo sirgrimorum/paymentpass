@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'config' => [ // the same as paymentpass config root, except available_services, services_production and services_test
+        'production' => true,
+        'mostrarEchos' => false,
+        'mostrarJsonEchos' => false,
+    ],
     'service' => [ // original configuration for the services, test mode will overwrite this with the services_test configurations
         'type' => 'normal', // type of service, default is 'normal', options are 'normal' or 'sdk' (need the sdk already installed)
         'public_key' => 'becc6f01a81612d64a8b8e0f034a535b',
