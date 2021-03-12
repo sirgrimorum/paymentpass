@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Sirgrimorum\PaymentPass\Models\PaymentPass;
+use Sirgrimorum\PaymentPass\Traits\RandomStringGenerator;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Http;
 use ReflectionClass;
@@ -20,6 +21,7 @@ use Sirgrimorum\PaymentPass\Jobs\RunCallableAfterPayment;
 
 class PaymentPassHandler
 {
+    use RandomStringGenerator;
 
     protected $service;
     public $config;
