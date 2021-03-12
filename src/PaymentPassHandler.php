@@ -1309,7 +1309,7 @@ class PaymentPassHandler
      * @param PaymentPass $payment The payment
      * @return string
      */
-    private function generateResponseCode(array $data = [], PaymentPass $payment = null)
+    public function generateResponseCode(array $data = [], PaymentPass $payment = null)
     {
         $curConfig = (new PaymentPassTranslator($data, $this->config, $this->config))->translate();
         if ($payment) {
