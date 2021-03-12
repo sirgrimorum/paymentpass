@@ -894,8 +894,8 @@ class PaymentPassHandler
             $reRevisar = true;
             if ($field_name == "__all__") {
                 return $result;
-            } elseif ( Str::startsWith($field_name, 'boolean|')) {
-                $datosParameters = explode(",", str_replace("boolean|","", $field_name));
+            } elseif (Str::startsWith($field_name, 'boolean|')) {
+                $datosParameters = explode(",", str_replace("boolean|", "", $field_name));
                 if (count($datosParameters) == 1) {
                     $piece = $this->getValorDesde($result, $datosParameters[0]) == true;
                 } elseif (count($datosParameters) == 2) {
@@ -920,7 +920,8 @@ class PaymentPassHandler
      * @param string $field_name The key or property name
      * @return mix The result
      */
-    private function getValorDesde($data, $field_name){
+    private function getValorDesde($data, $field_name)
+    {
         if (is_array($data) && $data !== null) {
             return Arr::get($data, $field_name, $field_name);
         } elseif (is_object($data) && $data !== null) {
@@ -930,7 +931,7 @@ class PaymentPassHandler
                 } else {
                     return $data->{$field_name};
                 }
-            } elseif (strpos($field_name, ".") !== false){
+            } elseif (strpos($field_name, ".") !== false) {
                 return Arr::get((array) $data, $field_name, $field_name);
             }
         } else {
@@ -1353,8 +1354,8 @@ class PaymentPassHandler
     {
         $auxConfig = $this->configSrc;
         $config = Arr::except($auxConfig, ['services_production', 'services_test']);
-        if (($configServicio = config("sirgrimorum.paymentpass_services.{$this->service}.config", false)) !== false){
-            if (is_array($configServicio)){
+        if (($configServicio = config("sirgrimorum.paymentpass_services.{$this->service}.config", false)) !== false) {
+            if (is_array($configServicio)) {
                 $config = $this->smartMergeConfig($config, $configServicio);
             }
         }
@@ -1460,7 +1461,7 @@ class PaymentPassHandler
         if (!Arr::get($this->config, "production", false) && Arr::get($this->config, "mostrarEchos", false)) {
             if (!request()->wantsJson()) {
                 dump($datos);
-                if (Arr::get($this->config, "mostrarJsonEchos", false) && $mostrarJson){
+                if (Arr::get($this->config, "mostrarJsonEchos", false) && $mostrarJson) {
                     echo "<pre><code>" . json_encode($datos, JSON_PRETTY_PRINT) . "</code></pre>";
                 }
             }
