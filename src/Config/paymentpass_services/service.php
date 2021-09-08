@@ -339,6 +339,9 @@ return [
                 'reference' => '__request__data_id',
                 'response' => '__data__merchant_order_info.preference_id',
                 'payment_state' => '__data__payment_info.status_detail',
+                 // valor que retorna el request al webhook
+                 'fail_not_found' => true, // si no encuentra un registro en payment_passes con ese referenceCode, falla, por defeto true para evitar ataques, si está en producción no se tiene en cuenta y es false
+                 'create_not_found' => false, // si no encuentra el registro y no falla, guardar el registro nuevo, por defecto es false
                 'save_data' => '__all__' // __all__ will save all the request data in the response_data field or specify an array of the request fields to use,
             ],
         ],

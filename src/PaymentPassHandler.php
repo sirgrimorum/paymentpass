@@ -166,7 +166,7 @@ class PaymentPassHandler
             $responseType = "error";
         }
         if ($responseType == "error") {
-            $error = str_replace([":referenceCode", ":error"], [$request->get(Arr::get($curConfig, "service.$responseType.referenceCode")), $request->get("error", "Unknown error")], trans("paymentpass::messages.error"));
+            $error = str_replace([":referenceCode", ":error"], [$request->get(Arr::get($curConfig, "service.webhooks.$responseType.referenceCode")), $request->get("error", "Unknown error")], trans("paymentpass::messages.error"));
             $callbackFunc = Arr::get($curConfig, "service.callbacks.failure", "");
             if (is_callable($callbackFunc)) {
                 call_user_func($callbackFunc, $error);
@@ -221,7 +221,7 @@ class PaymentPassHandler
                 if ($noexiste) {
                     $this->payment = new PaymentPass();
                 } else {
-                    if ($this->isJsonString($this->payment->creation_data)) {
+                    if (isset($this->payment->creation_data) && $this->isJsonString($this->payment->creation_data)) {
                         $curConfig = (new PaymentPassTranslator(json_decode($this->payment->creation_data, true), $curConfig, $this->config, false))->translate();
                     }
                 }
@@ -303,6 +303,7 @@ class PaymentPassHandler
                     } else {
                         $callbackFunc = Arr::get($curConfig, "service.callbacks.$state", Arr::get($curConfig, "service.callbacks.other", ""));
                         if (is_callable($callbackFunc)) {
+
                             call_user_func($callbackFunc, $this->payment);
                         }
                     }
@@ -318,7 +319,7 @@ class PaymentPassHandler
                 }
             } else {
                 if ($request->isMethod('get')) {
-                    Session::flash(Arr::get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$request->get(Arr::get($curConfig, "service.$responseType.referenceCode"))], trans("paymentpass::messages.not_found")));
+                    Session::flash(Arr::get($curConfig, "error_messages_key"), str_replace([":referenceCode"], [$request->get(Arr::get($curConfig, "service.webhooks.$responseType.referenceCode"))], trans("paymentpass::messages.not_found")));
                 } else {
                     return response()->json('not_found', Arr::get($configResponse, "fail_not_found_code", 200));
                 }
