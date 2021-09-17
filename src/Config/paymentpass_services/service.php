@@ -245,6 +245,7 @@ return [
             'confirmation' => [ // how to map the PaymentPass model with the post or get data for this specifc response call
                 'url' => "", // url of the callback to this response, if blank or not present it will be route("paymentpass::response",["service"=>"this service","responseType"=>"this response type"], use: __route__ will evaluate route() and __url__ will evaluate url(), use , to separate parameters and json notation for array parameters
                 'url_field_name' => "notification_url", //name of the field name for the url to send in parameters, leave empty for not adding it to parameters
+                'es_jwt' => false, // if the payload comes as an JWT, default false
                 'pre_actions' => [ // things to do before processing the response, works in the same way as actions of types sdk and http
                     'sdk_action' => [
                         'field_name' => '', //name of the key to save the returned values, leave blank for not saving the returned value

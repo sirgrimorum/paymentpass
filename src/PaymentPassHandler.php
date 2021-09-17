@@ -183,8 +183,13 @@ class PaymentPassHandler
                 'config' => $curConfig,
             ], 200);
         } else {
-            $datos = $request->all();
             $configResponse = Arr::get($curConfig, "service.webhooks.$responseType");
+            if (Arr::get($configResponse, "es_jwt", false)){
+                $datos = json_decode(base64_decode(str_replace('_', '/', str_replace('-','+',explode('.', $request->getContent())[1]))), true);
+                $request->merge($datos);
+            }else{
+                $datos = $request->all();
+            }
             if (!$this->conditionsFunction(Arr::get($configResponse, "if", []), $curConfig, $datos)) {
                 return response()->json('no_aplica', Arr::get($configResponse, "final_response_code", 200));
             }
