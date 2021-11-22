@@ -203,7 +203,14 @@ class PaymentPassTranslator
      */
     public function transSingleString($item, $data, $configComplete, $result = [], $request = false, $close = "__")
     {
-
+        if (is_array($configComplete)) {
+            $booleanAsStr = Arr::get($configComplete, "_booleanAsStr", true);
+            if (is_string($this->booleanAsStr)){
+                $booleanAsStr = $this->booleanAsStr != "false";
+            }
+        }else{
+            $booleanAsStr = $this->booleanAsStr;
+        }
         $dataParaFunctions = [
             "data" => $data,
             'datetime_utc' => $data,
@@ -230,9 +237,9 @@ class PaymentPassTranslator
         $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
         foreach ($this->functionsToProcess as $function) {
             if ($request !== false && $function == "data") {
-                $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $this->booleanAsStr);
+                $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $booleanAsStr);
             } else {
-                $item = PaymentPassTranslator::translateString($item, "__{$function}__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $this->booleanAsStr);
+                $item = PaymentPassTranslator::translateString($item, "__{$function}__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $booleanAsStr);
             }
         }
         return $item;
