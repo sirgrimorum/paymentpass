@@ -205,8 +205,8 @@ class PaymentPassTranslator
     {
         if (is_array($configComplete)) {
             $booleanAsStr = Arr::get($configComplete, "_booleanAsStr", true);
-            if (is_string($this->booleanAsStr)){
-                $booleanAsStr = $this->booleanAsStr != "false";
+            if (is_string($booleanAsStr)){
+                $booleanAsStr = $booleanAsStr != "false";
             }
         }else{
             $booleanAsStr = $this->booleanAsStr;
