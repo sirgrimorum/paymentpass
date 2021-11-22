@@ -12,6 +12,7 @@ return [
         'private_key' => '6935527cbe5e8c70dd3867bf4949eb01',
         'p_key' => '6f59ca2470871b25f1372f67ffe8aa1dec0f8e3f',
         'p_cust_id_cliente' => '498295',
+        //'_booleanAsStr' => true, // if the boolean in parameters should be treated as string or boolean, default true. Use it on service or action level config
         'test' => false,
         'pre_actions' => [ // things to do before any sdk call for type 'sdk', works in the same way as actions of type sdk
             'setKeys' => [

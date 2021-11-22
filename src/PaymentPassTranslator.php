@@ -98,13 +98,22 @@ class PaymentPassTranslator
      */
     private $functionsToProcess;
 
-    function __construct(array $data = [], array $config = [], array $configComplete = [], $request = false, $booleanAsStr = true)
+    function __construct(array $data = [], array $config = [], array $configComplete = [], $request = false, $booleanAsStr = null)
     {
         $this->data = $data;
         $this->config = $config;
         $this->configComplete = $configComplete;
         $this->request = $request;
-        $this->booleanAsStr = $booleanAsStr;
+        $this->booleanAsStr = true;
+        if (is_array($config)) {
+            $this->booleanAsStr = Arr::get($config, "_booleanAsStr", true);
+            if (is_string($this->booleanAsStr)){
+                $this->booleanAsStr = $this->booleanAsStr != "false";
+            }
+        }
+        if (isset($booleanAsStr)) {
+            $this->booleanAsStr = $booleanAsStr;
+        }
         $this->except($this->except);
     }
 
@@ -192,7 +201,8 @@ class PaymentPassTranslator
      * @param string $close Optional, the closing string for the prefix, default is '__'
      * @return string The string with the results of the evaluations
      */
-    public function transSingleString($item, $data, $configComplete, $result = [], $request = false, $close = "__"){
+    public function transSingleString($item, $data, $configComplete, $result = [], $request = false, $close = "__")
+    {
 
         $dataParaFunctions = [
             "data" => $data,
@@ -214,11 +224,11 @@ class PaymentPassTranslator
             "service_parameters_all" => $configComplete,
         ];
         $functionsToProcess = $this->functionsToProcess;
-        if (in_array("auto", $functionsToProcess)){
+        if (in_array("auto", $functionsToProcess)) {
             $functionsToProcess[] = "auto";
         }
         $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
-        foreach($this->functionsToProcess as $function){
+        foreach ($this->functionsToProcess as $function) {
             if ($request !== false && $function == "data") {
                 $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $this->booleanAsStr);
             } else {
@@ -300,11 +310,11 @@ class PaymentPassTranslator
                             } elseif ($function == 'post') {
                                 $resto = explode(":", $textPiece);
                                 $postFunction = array_shift($resto);
-                                if (count($resto) > 1){
+                                if (count($resto) > 1) {
                                     $restoStr = implode(":", $resto);
-                                }elseif (count($resto)==1){
+                                } elseif (count($resto) == 1) {
                                     $restoStr = $resto[0];
-                                }else{
+                                } else {
                                     $restoStr = "";
                                 }
                                 $piece = "__{$postFunction}__$restoStr";
