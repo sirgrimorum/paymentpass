@@ -772,7 +772,6 @@ class PaymentPassHandler
                             $this->lanzarDump(["llamando $action de {$this->service}" => [
                                 "actionConfig" => $actionConfig,
                                 "callParameters" => $callParameters,
-                                "curConfig" => $curConfig,
                             ]], true);
                             $response = $httpRequest->{$actionConfig['method']}($actionConfig['action'], $callParameters);
                             if ($response->successful()) {

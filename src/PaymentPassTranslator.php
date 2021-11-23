@@ -107,7 +107,7 @@ class PaymentPassTranslator
         $this->booleanAsStr = true;
         if (is_array($config)) {
             $this->booleanAsStr = Arr::get($config, "_booleanAsStr", true);
-            if (is_string($this->booleanAsStr)){
+            if (is_string($this->booleanAsStr)) {
                 $this->booleanAsStr = $this->booleanAsStr != "false";
             }
         }
@@ -205,41 +205,50 @@ class PaymentPassTranslator
     {
         if (is_array($configComplete)) {
             $booleanAsStr = Arr::get($configComplete, "_booleanAsStr", true);
-            if (is_string($booleanAsStr)){
+            if (is_string($booleanAsStr)) {
                 $booleanAsStr = $booleanAsStr != "false";
             }
-        }else{
+        } else {
             $booleanAsStr = $this->booleanAsStr;
         }
-        $dataParaFunctions = [
-            "data" => $data,
-            'datetime_utc' => $data,
-            'datetime' => $data,
-            "config_action" => $configComplete,
-            "pre_action" => Arr::get($configComplete, "datosPre", []),
-            "config_paymentpass" => $configComplete,
-            "auto" => $data,
-            "auto_config" => $this->config,
-        ];
-        $configParaFunctions = [
-            "config_action" => $result,
-            "pre_action" => $result,
-            "config_paymentpass" => $result,
-            "auto" => $result,
-            "auto_config" => $result,
-            "service_parameters" => $configComplete,
-            "service_parameters_all" => $configComplete,
-        ];
-        $functionsToProcess = $this->functionsToProcess;
-        if (in_array("auto", $functionsToProcess)) {
-            $functionsToProcess[] = "auto";
+        if (is_bool($item) && $booleanAsStr){
+            $item = ($item) ? "true" : "false";
+        } elseif ($item === "true" && !$booleanAsStr) {
+            $item = true;
+        } elseif ($item === "false" && !$booleanAsStr) {
+            $item = false;
         }
-        $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
-        foreach ($this->functionsToProcess as $function) {
-            if ($request !== false && $function == "data") {
-                $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $booleanAsStr);
-            } else {
-                $item = PaymentPassTranslator::translateString($item, "__{$function}__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $booleanAsStr);
+        if (is_string($item)) {
+            $dataParaFunctions = [
+                "data" => $data,
+                'datetime_utc' => $data,
+                'datetime' => $data,
+                "config_action" => $configComplete,
+                "pre_action" => Arr::get($configComplete, "datosPre", []),
+                "config_paymentpass" => $configComplete,
+                "auto" => $data,
+                "auto_config" => $this->config,
+            ];
+            $configParaFunctions = [
+                "config_action" => $result,
+                "pre_action" => $result,
+                "config_paymentpass" => $result,
+                "auto" => $result,
+                "auto_config" => $result,
+                "service_parameters" => $configComplete,
+                "service_parameters_all" => $configComplete,
+            ];
+            $functionsToProcess = $this->functionsToProcess;
+            if (in_array("auto", $functionsToProcess)) {
+                $functionsToProcess[] = "auto";
+            }
+            $item = str_replace(config("sirgrimorum.crudgenerator.locale_key"), App::getLocale(), $item);
+            foreach ($this->functionsToProcess as $function) {
+                if ($request !== false && $function == "data") {
+                    $item = PaymentPassTranslator::translateString($item, "__request__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $booleanAsStr);
+                } else {
+                    $item = PaymentPassTranslator::translateString($item, "__{$function}__", $function, Arr::get($dataParaFunctions, $function, []), Arr::get($configParaFunctions, $function, []), $close, $booleanAsStr);
+                }
             }
         }
         return $item;
@@ -264,7 +273,14 @@ class PaymentPassTranslator
      */
     public static function translateString($item, $prefix, $function, $data = [], $config = [], $close = "__", $booleanAsStr = true)
     {
-        if (isset($item)) {
+        if (is_bool($item) && $booleanAsStr){
+            $item = ($item) ? "true" : "false";
+        } elseif ($item === "true" && !$booleanAsStr) {
+            $item = true;
+        } elseif ($item === "false" && !$booleanAsStr) {
+            $item = false;
+        }
+        if (isset($item) && is_string($item)) {
             $result = "";
             if (Str::contains($item, $prefix)) {
                 if (($left = (stripos($item, $prefix))) !== false) {
@@ -408,6 +424,10 @@ class PaymentPassTranslator
                             $piece = json_encode($piece);
                         } elseif (is_bool($piece) && $booleanAsStr) {
                             $piece = ($piece) ? "true" : "false";
+                        } elseif ($piece === "true" && !$booleanAsStr) {
+                            $piece = true;
+                        } elseif ($piece === "false" && !$booleanAsStr) {
+                            $piece = false;
                         }
                         if (is_string($piece) || is_numeric($piece)) {
                             if ($right <= strlen($item)) {
