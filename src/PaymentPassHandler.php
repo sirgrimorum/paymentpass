@@ -747,7 +747,15 @@ class PaymentPassHandler
                         }
                         $actionConfig = (new PaymentPassTranslator($data, $actionConfig, $actionConfig))->just(['pre_action'])->translate();
                     }
+                    $cambiar_bastr = false;
+                    if (!Arr::has($curConfig, "_booleanAsStr") && Arr::has($actionConfig, "_booleanAsStr")){
+                        $curConfig["_booleanAsStr"] = $actionConfig["_booleanAsStr"];
+                        $cambiar_bastr = true;
+                    }
                     $callParameters = $this->translate_parameters(Arr::get($actionConfig, 'call_parameters', []), $curConfig, $data);
+                    if ($cambiar_bastr){
+                        unset($curConfig["_booleanAsStr"]);
+                    }
                     $httpRequest = Http::retry(3, 100);
                     if (count(Arr::get($actionConfig, 'headers', [])) > 0 && Arr::get($actionConfig, 'authentication.type', 'nada') != 'aws_sign_v4') {
                         $httpRequest = $httpRequest->withHeaders($actionConfig['headers']);
