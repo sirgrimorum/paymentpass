@@ -43,7 +43,7 @@ class RunCallableAfterPayment implements ShouldQueue
             $curConfig = (new PaymentPassHandler($this->service))->config;
             $callbackFunc = Arr::get($curConfig, "service.callbacks.{$this->state}", Arr::get($curConfig, "service.callbacks.other", ""));
             if (is_callable($callbackFunc)) {
-                call_user_func($callbackFunc, $this->payment);
+                call_user_func($callbackFunc, $this->paymentpass);
             }
         }
     }
