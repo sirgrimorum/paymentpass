@@ -27,7 +27,8 @@ class PaymentPass extends Model {
             //'user',
     ];
 
-    public function _construct() {
+    public function __construct(array $attributes = []) {
+        parent::__construct($attributes);
         $this->error_messages = [
         ];
     }
