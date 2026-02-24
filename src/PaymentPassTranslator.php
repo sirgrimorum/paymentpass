@@ -196,3 +196,114 @@ class PaymentPassTranslator
                                             } catch (Exception $exc) { $piece = ""; }
                                         } else { $piece = ""; }
                                         break;
+                                    case "tax_inv":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
+                                            $valor = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                            try { $piece = number_format($valor - ($valor / (1 + $impuesto)), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) { $piece = ""; }
+                                        } else { $piece = ""; }
+                                        break;
+                                    case "valueToPay":
+                                        if (count($datosParameters) == 3) {
+                                            $impuesto = (float) PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config);
+                                            $base = (float) PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                            try { $piece = number_format($base * (1 + $impuesto), $datosParameters[2], ".", "");
+                                            } catch (Exception $exc) { $piece = ""; }
+                                        } else { $piece = ""; }
+                                        break;
+                                    case "boolean":
+                                        if (count($datosParameters) == 1) {
+                                            $piece = PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config) == true;
+                                        } elseif (count($datosParameters) == 2) {
+                                            $piece = PaymentPassTranslator::getValorDesde($datosParameters[0], $data, $config) == PaymentPassTranslator::getValorDesde($datosParameters[1], $data, $config);
+                                        } else { $piece = false; }
+                                        break;
+                                    default:
+                                        $piece = $textPiece;
+                                        break;
+                                }
+                            } else {
+                                $piece = call_user_func($function, $textPiece);
+                            }
+                        }
+                        if (is_object($piece) || is_array($piece)) {
+                            $piece = json_encode($piece);
+                        } elseif (is_bool($piece) && $booleanAsStr) {
+                            $piece = ($piece) ? "true" : "false";
+                        } elseif ($piece === "true" && !$booleanAsStr) { $piece = true;
+                        } elseif ($piece === "false" && !$booleanAsStr) { $piece = false; }
+                        if (is_string($piece) || is_numeric($piece)) {
+                            if ($right <= strlen($item)) {
+                                $item = substr($item, 0, $left) . $piece . substr($item, $right + 2);
+                            } else {
+                                $item = substr($item, 0, $left) . $piece;
+                            }
+                            $left = (stripos($item, $prefix));
+                            if ($item == $piece) {
+                                $left = false;
+                            }
+                        } else {
+                            $item = $piece;
+                            $left = false;
+                        }
+                    }
+                }
+                $result = $item;
+            } else {
+                $result = $item;
+            }
+            return $result;
+        }
+        return $item;
+    }
+    private static function getValorDesde($dato, $config1, $config2)
+    {
+        $aux = PaymentPassTranslator::getValor($dato, $config1);
+        if ($aux == $dato && $config1 != $config2) {
+            $aux = PaymentPassTranslator::getValor($dato, $config2);
+        }
+        return $aux;
+    }
+    private static function getValor($dato, $data)
+    {
+        if (!is_array($data) || (is_array($data) && count($data) == 0)) {
+            return $dato;
+        } elseif (Arr::has($data, $dato)) {
+            return Arr::get($data, $dato, $dato);
+        } else {
+            foreach ($data as $key => $item) {
+                if (is_array($item)) {
+                    $aux = PaymentPassTranslator::getValor($dato, $item);
+                    if ($aux != $dato) { return $aux; }
+                }
+            }
+            return $dato;
+        }
+    }
+    public static function paramsForJs($params, $esPrimero = false)
+    {
+        if (is_array($params)) {
+            if (count($params) == 0) { return ""; }
+            $return = !$esPrimero ? "{" : "";
+            $i = 0;
+            foreach ($params as $paramKey => $paramValue) {
+                if (!is_int($paramKey)) { $return .= "'{$paramKey}':"; }
+                if (is_array($paramValue)) {
+                    $return .= PaymentPassTranslator::paramsForJs($paramValue);
+                } else {
+                    if (Str::startsWith($paramValue, ['function', ' function'])) {
+                        $return .= "{$paramValue}";
+                    } else { $return .= "'{$paramValue}'"; }
+                }
+                if ($i < count($params) - 1) { $return .= ","; }
+            }
+            $return .= !$esPrimero ? "}" : "";
+            return $return;
+        } elseif ($params != '' && $params != null) {
+            if (Str::startsWith($params, ['funtion', ' funciton'])) { return "{$params}"; }
+            return "'{$params}'";
+        }
+        return "";
+    }
+}
