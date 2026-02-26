@@ -21,6 +21,7 @@
     },
     "require-dev": {
         "phpunit/phpunit": "^10.0",
+        "orchestra/testbench": "^8.0|^9.0",
         "squizlabs/php_codesniffer": "^2.3"
     },
     "autoload": {
@@ -32,7 +33,9 @@
         }
     },
     "autoload-dev": {
-
+        "psr-4": {
+            "Sirgrimorum\\PaymentPass\\Tests\\": "tests/"
+        }
     },
     "extra": {
         "branch-alias": {
