@@ -40,6 +40,8 @@ abstract class TestCase extends Orchestra
 
     protected function getEnvironmentSetUp($app): void
     {
+        \Illuminate\Support\Facades\Schema::defaultStringLength(191);
+
         $app['config']->set('database.default', 'mysql');
         $app['config']->set('database.connections.mysql', [
             'driver'   => 'mysql',
