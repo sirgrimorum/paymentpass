@@ -59,5 +59,6 @@
 @endif
 @if (\Illuminate\Support\Arr::get($actionConfig, "con_script", false)!== false && \Illuminate\Support\Arr::get($actionConfig, "con_script", false)!= "")
 {!! $actionConfig['con_script']  !!}
+@endif
 @endpush
 
